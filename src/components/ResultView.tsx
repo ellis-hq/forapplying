@@ -1,18 +1,19 @@
-import React from 'react';
-import { 
-  Download, 
+import React, { useState } from 'react';
+import {
+  Download,
   XCircle,
   Target,
   FileBadge,
-  FileText
+  FileText,
+  Loader2
 } from 'lucide-react';
 import { TailorResponse } from '../types';
 
 interface ResultViewProps {
   result: TailorResponse;
   matchScore: number;
-  downloadResume: () => void;
-  downloadCoverLetter: () => void;
+  downloadResume: () => Promise<void>;
+  downloadCoverLetter: () => Promise<void>;
   company: string;
 }
 
@@ -32,6 +33,27 @@ const ResultView: React.FC<ResultViewProps> = ({
   downloadResume,
   downloadCoverLetter,
 }) => {
+  const [isDownloadingResume, setIsDownloadingResume] = useState(false);
+  const [isDownloadingCoverLetter, setIsDownloadingCoverLetter] = useState(false);
+
+  const handleDownloadResume = async () => {
+    setIsDownloadingResume(true);
+    try {
+      await downloadResume();
+    } finally {
+      setIsDownloadingResume(false);
+    }
+  };
+
+  const handleDownloadCoverLetter = async () => {
+    setIsDownloadingCoverLetter(true);
+    try {
+      await downloadCoverLetter();
+    } finally {
+      setIsDownloadingCoverLetter(false);
+    }
+  };
+
   return (
     <main className="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-4 gap-8 animate-fade-in">
       {/* Keyword Coverage & Score */}
@@ -98,16 +120,28 @@ const ResultView: React.FC<ResultViewProps> = ({
             </div>
             <div className="flex gap-2 flex-wrap">
               <button
-                onClick={downloadResume}
-                className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm font-bold shadow-sm transition-all"
+                onClick={handleDownloadResume}
+                disabled={isDownloadingResume}
+                className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover disabled:bg-accent/70 text-white rounded-lg text-sm font-bold shadow-sm transition-all disabled:cursor-not-allowed"
               >
-                <Download className="w-4 h-4" /> Download Resume
+                {isDownloadingResume ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+                {isDownloadingResume ? 'Downloading...' : 'Download Resume'}
               </button>
               <button
-                onClick={downloadCoverLetter}
-                className="flex items-center gap-2 px-4 py-2 border border-border hover:bg-border-light text-text-secondary rounded-lg text-sm font-bold transition-all"
+                onClick={handleDownloadCoverLetter}
+                disabled={isDownloadingCoverLetter}
+                className="flex items-center gap-2 px-4 py-2 border border-border hover:bg-border-light disabled:bg-border-light/50 text-text-secondary rounded-lg text-sm font-bold transition-all disabled:cursor-not-allowed"
               >
-                <Download className="w-4 h-4" /> Download Cover Letter
+                {isDownloadingCoverLetter ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+                {isDownloadingCoverLetter ? 'Downloading...' : 'Cover Letter (Optional)'}
               </button>
             </div>
           </div>

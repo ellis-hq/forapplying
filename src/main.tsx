@@ -1,11 +1,7 @@
-console.log('[main.tsx] Starting imports...');
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-console.log('[main.tsx] React imported successfully');
 import App from './App';
-console.log('[main.tsx] App imported successfully');
 import './index.css';
-console.log('[main.tsx] CSS imported successfully');
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

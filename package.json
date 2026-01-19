@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.52.0",
+    "@supabase/supabase-js": "^2.90.1",
     "jspdf": "^2.5.2",
     "lucide-react": "^0.462.0",
     "pdfjs-dist": "^4.8.69",

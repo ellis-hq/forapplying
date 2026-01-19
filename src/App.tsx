@@ -1,14 +1,23 @@
 import React, { useState, useMemo, useCallback } from 'react';
+import { User } from '@supabase/supabase-js';
 import { extractTextFromPDF, generateATSPDF, generateCoverLetterPDF } from './services/pdfService';
 import { tailorResume as tailorResumeAPI, generateGapSuggestion } from './services/claudeService';
 import { TailorResponse, RewriteMode, AppView, EditableResumeData, GapTargetSection, ResumeStyle } from './types';
+import { UserProfile } from './lib/supabase';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import InputView from './components/InputView';
 import ResultView from './components/ResultView';
 import ReviewEditView from './components/ReviewEditView';
+import AuthGate from './components/AuthGate';
 
-const App: React.FC = () => {
+type ResumeTailorProps = {
+  user: User;
+  profile: UserProfile;
+  onDownload: () => Promise<void>;
+};
+
+const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }) => {
   const [file, setFile] = useState<File | null>(null);
   const [jobDesc, setJobDesc] = useState('');
   const [company, setCompany] = useState('');
@@ -66,16 +75,28 @@ const App: React.FC = () => {
     }
   };
 
-  const downloadResume = () => {
+  const downloadResume = async () => {
     if (!result) return;
+    // Track the download (don't block on failure)
+    try {
+      await onDownload();
+    } catch (err) {
+      console.error('Failed to track download:', err);
+    }
     // Use edited resume if available, otherwise use original
     const resumeToDownload = editedResume || result.resume;
     const doc = generateATSPDF(resumeToDownload);
     doc.save(`${resumeToDownload.contact.name.replace(/\s+/g, '_')}_Resume_${company.replace(/\s+/g, '_')}.pdf`);
   };
 
-  const downloadCoverLetter = () => {
+  const downloadCoverLetter = async () => {
     if (!result) return;
+    // Track the download (don't block on failure)
+    try {
+      await onDownload();
+    } catch (err) {
+      console.error('Failed to track download:', err);
+    }
     const doc = generateCoverLetterPDF(result.coverLetter, result.resume.contact);
     doc.save(`Cover_Letter_${company.replace(/\s+/g, '_')}.pdf`);
   };
@@ -158,6 +179,20 @@ const App: React.FC = () => {
 
       <Footer />
     </div>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <AuthGate>
+      {(user, profile, incrementDownloads) => (
+        <ResumeTailor
+          user={user}
+          profile={profile}
+          onDownload={incrementDownloads}
+        />
+      )}
+    </AuthGate>
   );
 };
 

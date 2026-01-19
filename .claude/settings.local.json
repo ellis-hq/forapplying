@@ -9,7 +9,14 @@
       "Bash(pgrep:*)",
       "Bash(lsof:*)",
       "Bash(pkill:*)",
-      "Bash(npx vite:*)"
+      "Bash(npx vite:*)",
+      "Bash(git remote:*)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run dev:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd Supabase authentication with daily download limits\n\n- Add AuthGate component for login/signup flow\n- Track resume downloads per user \\(5 free per day\\)\n- Auto-reset download count every 24 hours\n- Show daily limit message when limit reached\n- Add loading states and visual feedback to download buttons\n- Cover letter download is optional but counts toward limit\n- Integrate Supabase client with environment variables\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ]
   }
 }
