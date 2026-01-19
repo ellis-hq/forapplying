@@ -13,7 +13,7 @@ const Header: React.FC<HeaderProps> = ({ showReset, onReset }) => (
         <FileText className="text-white w-8 h-8" />
       </div>
       <div>
-        <h1 className="text-2xl font-bold text-text-primary">Forapplying</h1>
+        <h1 className="text-2xl font-bold text-text-primary">Forapply</h1>
         <p className="text-text-muted text-sm">Professional keyword-mapping engine</p>
       </div>
     </div>

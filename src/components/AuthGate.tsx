@@ -214,8 +214,11 @@ export default function AuthGate({ children }: AuthGateProps) {
         <div className="w-full max-w-md">
           <div className="bg-white rounded-2xl shadow-xl p-8">
             <div className="text-center mb-8">
-              <h1 className="text-2xl font-bold text-gray-900">ATS Resume Tailor</h1>
-              <p className="text-gray-600 mt-2">
+              <h1 className="text-3xl font-bold text-gray-900">Welcome to Forapply</h1>
+              <p className="text-gray-600 mt-3 text-sm leading-relaxed">
+                Optimize your resume to get past ATS systems and land more interviews. Free users get 5 downloads per day.
+              </p>
+              <p className="text-gray-500 mt-4 text-sm">
                 {isLogin ? 'Sign in to continue' : 'Create your free account'}
               </p>
             </div>
@@ -286,7 +289,7 @@ export default function AuthGate({ children }: AuthGateProps) {
                   <svg className="w-5 h-5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  5 free resume downloads
+                  5 free downloads per day
                 </li>
                 <li className="flex items-center gap-3 text-sm text-gray-600">
                   <svg className="w-5 h-5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -327,8 +330,11 @@ export default function AuthGate({ children }: AuthGateProps) {
             </div>
 
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Daily Limit Reached</h2>
-            <p className="text-gray-600 mb-6">
-              You've reached your limit of {DOWNLOAD_LIMIT} free downloads today. Your downloads will reset in approximately {hoursUntilReset} hour{hoursUntilReset !== 1 ? 's' : ''}.
+            <p className="text-gray-600 mb-4">
+              You've used all {DOWNLOAD_LIMIT} free downloads today. Come back tomorrow!
+            </p>
+            <p className="text-sm text-gray-500 mb-6">
+              Downloads reset in approximately {hoursUntilReset} hour{hoursUntilReset !== 1 ? 's' : ''}.
             </p>
 
             <div className="bg-gray-50 rounded-lg p-4 mb-6">
@@ -358,7 +364,7 @@ export default function AuthGate({ children }: AuthGateProps) {
         <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
-              <h1 className="text-xl font-bold text-gray-900">ATS Resume Tailor</h1>
+              <h1 className="text-xl font-bold text-gray-900">Forapply</h1>
 
               <div className="flex items-center gap-6">
                 <div className="hidden sm:block">
