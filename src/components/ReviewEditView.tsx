@@ -19,6 +19,7 @@ interface ReviewEditViewProps {
   resumeStyle: ResumeStyle;
   onGenerateSuggestion: (skill: string, targetSection: GapTargetSection) => Promise<string>;
   onContinue: (editedResume: EditableResumeData) => void;
+  onEditResume?: () => void;
 }
 
 const ReviewEditView: React.FC<ReviewEditViewProps> = ({
@@ -26,7 +27,8 @@ const ReviewEditView: React.FC<ReviewEditViewProps> = ({
   jobDescription,
   resumeStyle,
   onGenerateSuggestion,
-  onContinue
+  onContinue,
+  onEditResume
 }) => {
   // Editable resume state - deep clone to avoid mutations
   const [editedResume, setEditedResume] = useState<EditableResumeData>(() => ({
@@ -248,6 +250,17 @@ const ReviewEditView: React.FC<ReviewEditViewProps> = ({
               ))}
             </div>
           </div>
+        )}
+
+        {/* Edit Resume Button */}
+        {onEditResume && (
+          <button
+            onClick={onEditResume}
+            className="w-full flex items-center justify-center gap-2 px-6 py-3 border border-accent text-accent hover:bg-accent-light rounded-xl text-sm font-medium transition-all"
+          >
+            <Pencil className="w-4 h-4" />
+            Edit Resume in Builder
+          </button>
         )}
 
         {/* Continue Button */}

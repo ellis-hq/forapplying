@@ -91,6 +91,32 @@ CRITICAL DATE PRESERVATION:
 - If months are present in the source, they MUST appear in the output
 - Check for "Present" or current employment indicators
 
+═══════════════════════════════════════════════════════════════
+SECTION PRESERVATION RULES - ABSOLUTELY CRITICAL
+═══════════════════════════════════════════════════════════════
+
+You MUST preserve EVERY section from the original resume, even if it doesn't match standard categories:
+- Sections to ALWAYS look for and include: Certifications, Licenses, Clinical Hours, Practicum, Fieldwork, Internships, Volunteer Work, Publications, Languages, Awards, Honors, Professional Memberships, Conferences, Research, Teaching Experience
+- If a section exists in the original resume, it MUST appear in the output - NEVER drop or merge sections
+- If you're unsure what category something belongs to, include it in an appropriate section or create an 'Additional Information' section
+- Before finalizing your response, CROSS-CHECK that every section header from the original appears in your output
+- The "additionalSections" field in your JSON output should capture any non-standard sections from the original resume
+
+═══════════════════════════════════════════════════════════════
+GRAMMAR AND FORMATTING RULES - MANDATORY
+═══════════════════════════════════════════════════════════════
+
+- Every bullet point MUST be a complete, grammatically correct sentence or phrase
+- Check for and FIX: run-on sentences, sentence fragments, subject-verb agreement, tense consistency
+- Use CONSISTENT TENSE: past tense for previous roles, present tense for current role
+- Every bullet point should end with proper punctuation (period for complete sentences)
+- NO overlapping or repeated text - each bullet must be UNIQUE
+- NO orphaned words or cut-off sentences
+- PROOFREAD the summary/objective for complete sentences and proper punctuation
+- Ensure PROPER CAPITALIZATION of company names, job titles, technologies, and certifications
+- DOUBLE-CHECK all output for typos and grammatical errors before returning
+- Each bullet should START with a strong action verb
+
 ABSOLUTE GUARDRAILS - NEVER VIOLATE:
 1. NEVER fabricate responsibilities, achievements, or experiences not implied by the original
 2. NEVER add tools, technologies, or skills not reasonably connected to what's already on the resume
@@ -197,6 +223,8 @@ Respond with ONLY a valid JSON object matching this exact structure (no markdown
       "linkedin": "string or empty"
     },
     "summary": "string - professional summary optimized with keywords",
+    "objective": "string or empty - if present in original, preserve it",
+    "includeObjective": "boolean - true if objective was in original",
     "skills": {
       "tools": ["array of technical tools/technologies"],
       "core": ["array of core competencies/soft skills"]
@@ -207,17 +235,73 @@ Respond with ONLY a valid JSON object matching this exact structure (no markdown
         "role": "string",
         "location": "string",
         "dateRange": "string - FULL date range with months",
-        "bullets": ["array of achievement bullets"]
+        "bullets": ["array of achievement bullets - grammatically correct, unique, properly punctuated"]
       }
     ],
     "education": [
       {
         "school": "string",
         "degree": "string",
+        "fieldOfStudy": "string or empty",
         "dateRange": "string",
         "location": "string"
       }
-    ]
+    ],
+    "projects": [
+      {
+        "name": "string",
+        "dateRange": "string",
+        "description": "string",
+        "technologies": "string"
+      }
+    ],
+    "includeProjects": "boolean - true if projects section exists",
+    "certifications": [
+      {
+        "name": "string",
+        "issuer": "string",
+        "dateObtained": "string",
+        "expirationDate": "string or empty"
+      }
+    ],
+    "includeCertifications": "boolean - true if certifications exist",
+    "clinicalHours": [
+      {
+        "siteName": "string",
+        "role": "string",
+        "hoursCompleted": "number",
+        "description": "string or empty"
+      }
+    ],
+    "includeClinicalHours": "boolean - true if clinical/practicum/fieldwork exists",
+    "volunteer": [
+      {
+        "organization": "string",
+        "role": "string",
+        "dateRange": "string",
+        "description": "string"
+      }
+    ],
+    "includeVolunteer": "boolean - true if volunteer section exists",
+    "publications": [
+      {
+        "title": "string",
+        "publication": "string",
+        "date": "string"
+      }
+    ],
+    "includePublications": "boolean - true if publications exist",
+    "languages": ["array of languages with proficiency levels"],
+    "includeLanguages": "boolean - true if languages section exists",
+    "awards": [
+      {
+        "title": "string",
+        "issuer": "string",
+        "date": "string",
+        "description": "string or empty"
+      }
+    ],
+    "includeAwards": "boolean - true if awards/honors section exists"
   },
   "coverLetter": "string - full professional cover letter",
   "report": {

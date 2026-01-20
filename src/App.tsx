@@ -2,11 +2,13 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { User } from '@supabase/supabase-js';
 import { extractTextFromPDF, generateATSPDF, generateCoverLetterPDF } from './services/pdfService';
 import { tailorResume as tailorResumeAPI, generateGapSuggestion } from './services/claudeService';
-import { TailorResponse, RewriteMode, AppView, EditableResumeData, GapTargetSection, ResumeStyle } from './types';
+import { TailorResponse, RewriteMode, AppView, EditableResumeData, GapTargetSection, ResumeStyle, TailoredResumeData, ResumeEntryMode } from './types';
 import { UserProfile } from './lib/supabase';
 import Header from './components/Header';
 import Footer from './components/Footer';
+import WelcomeView from './components/WelcomeView';
 import InputView from './components/InputView';
+import ResumeBuilder from './components/ResumeBuilder';
 import ResultView from './components/ResultView';
 import ReviewEditView from './components/ReviewEditView';
 import AuthGate from './components/AuthGate';
@@ -26,8 +28,10 @@ const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<TailorResponse | null>(null);
-  const [currentView, setCurrentView] = useState<AppView>(AppView.INPUT);
+  const [currentView, setCurrentView] = useState<AppView>(AppView.WELCOME);
   const [editedResume, setEditedResume] = useState<EditableResumeData | null>(null);
+  const [entryMode, setEntryMode] = useState<ResumeEntryMode | null>(null);
+  const [builtResume, setBuiltResume] = useState<TailoredResumeData | null>(null);
 
   const matchScore = useMemo(() => {
     if (!result) return 0;
@@ -48,9 +52,138 @@ const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }
     }
   };
 
+  // Convert built resume to text format for Claude
+  const resumeToText = (resume: TailoredResumeData): string => {
+    let text = '';
+
+    // Contact
+    text += `${resume.contact.name}\n`;
+    text += `${resume.contact.email} | ${resume.contact.phone} | ${resume.contact.location}\n`;
+    if (resume.contact.linkedin) text += `${resume.contact.linkedin}\n`;
+    text += '\n';
+
+    // Objective
+    if (resume.includeObjective && resume.objective) {
+      text += `OBJECTIVE\n${resume.objective}\n\n`;
+    }
+
+    // Summary
+    if (resume.summary) {
+      text += `PROFESSIONAL SUMMARY\n${resume.summary}\n\n`;
+    }
+
+    // Skills
+    if (resume.skills.core.length > 0 || resume.skills.tools.length > 0) {
+      text += 'SKILLS\n';
+      if (resume.skills.core.length > 0) {
+        text += `Core Competencies: ${resume.skills.core.join(', ')}\n`;
+      }
+      if (resume.skills.tools.length > 0) {
+        text += `Tools & Technologies: ${resume.skills.tools.join(', ')}\n`;
+      }
+      text += '\n';
+    }
+
+    // Experience
+    if (resume.experience.length > 0) {
+      text += 'EXPERIENCE\n';
+      resume.experience.forEach(exp => {
+        text += `${exp.role} at ${exp.company}\n`;
+        text += `${exp.location} | ${exp.dateRange}\n`;
+        exp.bullets.forEach(bullet => {
+          if (bullet.trim()) text += `• ${bullet}\n`;
+        });
+        text += '\n';
+      });
+    }
+
+    // Education
+    if (resume.education.length > 0) {
+      text += 'EDUCATION\n';
+      resume.education.forEach(edu => {
+        text += `${edu.degree}${edu.fieldOfStudy ? ` in ${edu.fieldOfStudy}` : ''}\n`;
+        text += `${edu.school}, ${edu.location} | ${edu.dateRange}\n\n`;
+      });
+    }
+
+    // Projects
+    if (resume.includeProjects && resume.projects && resume.projects.length > 0) {
+      text += 'PROJECTS\n';
+      resume.projects.forEach(proj => {
+        text += `${proj.name} (${proj.dateRange})\n`;
+        text += `${proj.description}\n`;
+        if (proj.technologies) text += `Technologies: ${proj.technologies}\n`;
+        text += '\n';
+      });
+    }
+
+    // Certifications
+    if (resume.includeCertifications && resume.certifications && resume.certifications.length > 0) {
+      text += 'CERTIFICATIONS\n';
+      resume.certifications.forEach(cert => {
+        text += `${cert.name}, ${cert.issuer} (${cert.dateObtained})\n`;
+      });
+      text += '\n';
+    }
+
+    // Clinical Hours
+    if (resume.includeClinicalHours && resume.clinicalHours && resume.clinicalHours.length > 0) {
+      text += 'CLINICAL HOURS / PRACTICUM\n';
+      resume.clinicalHours.forEach(entry => {
+        text += `${entry.role} at ${entry.siteName} - ${entry.hoursCompleted} hours\n`;
+        if (entry.description) text += `${entry.description}\n`;
+        text += '\n';
+      });
+    }
+
+    // Volunteer
+    if (resume.includeVolunteer && resume.volunteer && resume.volunteer.length > 0) {
+      text += 'VOLUNTEER WORK\n';
+      resume.volunteer.forEach(vol => {
+        text += `${vol.role} at ${vol.organization} (${vol.dateRange})\n`;
+        text += `${vol.description}\n\n`;
+      });
+    }
+
+    // Publications
+    if (resume.includePublications && resume.publications && resume.publications.length > 0) {
+      text += 'PUBLICATIONS\n';
+      resume.publications.forEach(pub => {
+        text += `"${pub.title}" - ${pub.publication}, ${pub.date}\n`;
+      });
+      text += '\n';
+    }
+
+    // Languages
+    if (resume.includeLanguages && resume.languages && resume.languages.length > 0) {
+      text += `LANGUAGES\n${resume.languages.join(', ')}\n\n`;
+    }
+
+    // Awards
+    if (resume.includeAwards && resume.awards && resume.awards.length > 0) {
+      text += 'AWARDS & HONORS\n';
+      resume.awards.forEach(award => {
+        text += `${award.title}, ${award.issuer} (${award.date})\n`;
+        if (award.description) text += `${award.description}\n`;
+      });
+      text += '\n';
+    }
+
+    return text;
+  };
+
   const handleGenerate = async () => {
-    if (!file || !jobDesc.trim() || !company.trim()) {
-      setError('Please provide all inputs: Resume PDF, Job Description, and Company Name.');
+    // For upload mode, need file; for build mode, need builtResume
+    if (entryMode === ResumeEntryMode.UPLOAD && !file) {
+      setError('Please upload a resume PDF.');
+      return;
+    }
+    if (entryMode === ResumeEntryMode.BUILD && !builtResume) {
+      setError('Please build your resume first.');
+      return;
+    }
+    if (!jobDesc.trim() || !company.trim()) {
+      setError('Please provide Job Description and Company Name.');
       return;
     }
 
@@ -58,9 +191,17 @@ const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }
     setError(null);
 
     try {
-      const resumeText = await extractTextFromPDF(file);
-      if (!resumeText.trim()) {
-        throw new Error('Could not extract text from the PDF. It might be an image-only scan.');
+      let resumeText: string;
+
+      if (entryMode === ResumeEntryMode.UPLOAD && file) {
+        resumeText = await extractTextFromPDF(file);
+        if (!resumeText.trim()) {
+          throw new Error('Could not extract text from the PDF. It might be an image-only scan.');
+        }
+      } else if (builtResume) {
+        resumeText = resumeToText(builtResume);
+      } else {
+        throw new Error('No resume data available.');
       }
 
       const tailoringResult = await tailorResumeAPI(resumeText, jobDesc, company, mode, resumeStyle);
@@ -109,8 +250,46 @@ const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }
     setError(null);
     setMode(RewriteMode.CONSERVATIVE);
     setResumeStyle(ResumeStyle.CLASSIC);
-    setCurrentView(AppView.INPUT);
+    setCurrentView(AppView.WELCOME);
     setEditedResume(null);
+    setEntryMode(null);
+    setBuiltResume(null);
+  };
+
+  // Handler for selecting entry mode from welcome screen
+  const handleSelectMode = (mode: ResumeEntryMode) => {
+    setEntryMode(mode);
+    if (mode === ResumeEntryMode.UPLOAD) {
+      setCurrentView(AppView.INPUT);
+    } else {
+      setCurrentView(AppView.BUILDER);
+    }
+  };
+
+  // Handler for when resume builder completes
+  const handleBuilderContinue = (resume: TailoredResumeData) => {
+    setBuiltResume(resume);
+    setCurrentView(AppView.INPUT);
+  };
+
+  // Handler for going back to builder from input
+  const handleBackToBuilder = () => {
+    setCurrentView(AppView.BUILDER);
+  };
+
+  // Handler for going back to welcome
+  const handleBackToWelcome = () => {
+    setCurrentView(AppView.WELCOME);
+    setEntryMode(null);
+  };
+
+  // Handler for editing resume from review screen
+  const handleEditResume = () => {
+    if (result) {
+      setBuiltResume(result.resume);
+    }
+    setEntryMode(ResumeEntryMode.BUILD);
+    setCurrentView(AppView.BUILDER);
   };
 
   // Handler for generating gap suggestions via Claude API
@@ -137,7 +316,21 @@ const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }
 
   return (
     <div className="min-h-screen bg-bg flex flex-col items-center py-8 px-4">
-      <Header showReset={currentView !== AppView.INPUT} onReset={reset} />
+      <Header showReset={currentView !== AppView.WELCOME} onReset={reset} />
+
+      {currentView === AppView.WELCOME && (
+        <WelcomeView onSelectMode={handleSelectMode} />
+      )}
+
+      {currentView === AppView.BUILDER && (
+        <ResumeBuilder
+          initialData={builtResume}
+          resumeStyle={resumeStyle}
+          setResumeStyle={setResumeStyle}
+          onContinue={handleBuilderContinue}
+          onBack={handleBackToWelcome}
+        />
+      )}
 
       {currentView === AppView.INPUT && (
         <InputView
@@ -154,6 +347,10 @@ const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }
           setMode={setMode}
           setResumeStyle={setResumeStyle}
           handleGenerate={handleGenerate}
+          entryMode={entryMode}
+          builtResume={builtResume}
+          onBackToBuilder={handleBackToBuilder}
+          onBackToWelcome={handleBackToWelcome}
         />
       )}
 
@@ -164,6 +361,7 @@ const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }
           resumeStyle={resumeStyle}
           onGenerateSuggestion={handleGenerateSuggestion}
           onContinue={handleContinueFromReview}
+          onEditResume={handleEditResume}
         />
       )}
 

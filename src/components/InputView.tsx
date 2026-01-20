@@ -1,19 +1,21 @@
 import React, { useState } from 'react';
 import {
   Upload,
-  Briefcase,
   Building2,
   Settings2,
   ChevronRight,
+  ChevronLeft,
   Loader2,
   AlertCircle,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
   Info,
-  FileText
+  FileText,
+  PenTool,
+  Edit3
 } from 'lucide-react';
-import { RewriteMode, ResumeStyle, RESUME_STYLES } from '../types';
+import { RewriteMode, ResumeStyle, RESUME_STYLES, ResumeEntryMode, TailoredResumeData } from '../types';
 
 interface InputViewProps {
   file: File | null;
@@ -29,6 +31,10 @@ interface InputViewProps {
   setMode: (mode: RewriteMode) => void;
   setResumeStyle: (style: ResumeStyle) => void;
   handleGenerate: () => void;
+  entryMode: ResumeEntryMode | null;
+  builtResume: TailoredResumeData | null;
+  onBackToBuilder: () => void;
+  onBackToWelcome: () => void;
 }
 
 const StepLabel: React.FC<{ step: number; title: string }> = ({ step, title }) => (
@@ -54,11 +60,28 @@ const InputView: React.FC<InputViewProps> = ({
   setMode,
   setResumeStyle,
   handleGenerate,
+  entryMode,
+  builtResume,
+  onBackToBuilder,
+  onBackToWelcome,
 }) => {
   const [aboutExpanded, setAboutExpanded] = useState(false);
 
+  const isUploadMode = entryMode === ResumeEntryMode.UPLOAD;
+  const isBuildMode = entryMode === ResumeEntryMode.BUILD;
+  const hasResume = isUploadMode ? !!file : (isBuildMode && !!builtResume);
+
   return (
     <main className="max-w-4xl w-full animate-fade-in">
+      {/* Back Button */}
+      <button
+        onClick={isBuildMode ? onBackToBuilder : onBackToWelcome}
+        className="flex items-center gap-2 text-sm text-text-secondary hover:text-text-primary mb-4 transition-colors"
+      >
+        <ChevronLeft className="w-4 h-4" />
+        {isBuildMode ? 'Back to Resume Builder' : 'Back to Options'}
+      </button>
+
       {/* About Section */}
       <div className="bg-accent-light border border-accent-muted/30 rounded-xl mb-6">
         <button
@@ -88,32 +111,81 @@ const InputView: React.FC<InputViewProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Left Column - Steps 1 & 2 */}
         <div className="bg-surface p-6 rounded-2xl shadow-sm border border-border space-y-6">
-          {/* Step 1: Resume Upload */}
+          {/* Step 1: Resume (Upload or Built) */}
           <div>
-            <StepLabel step={1} title="Upload Your Resume" />
-            <div className={`relative border-2 border-dashed rounded-xl p-6 transition-all ${file ? 'border-accent-muted bg-accent-light' : 'border-border hover:border-accent-muted'}`}>
-              <input
-                type="file"
-                accept="application/pdf"
-                onChange={onFileChange}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-              />
-              <div className="flex flex-col items-center justify-center text-center">
-                {file ? (
-                  <>
-                    <CheckCircle2 className="w-8 h-8 text-accent mb-2" />
-                    <p className="text-text-primary font-medium text-sm truncate w-full">{file.name}</p>
-                    <p className="text-accent text-xs mt-1">Click or drag to replace</p>
-                  </>
+            <StepLabel step={1} title={isUploadMode ? "Upload Your Resume" : "Your Resume"} />
+
+            {isUploadMode ? (
+              // Upload Mode - File upload UI
+              <div className={`relative border-2 border-dashed rounded-xl p-6 transition-all ${file ? 'border-accent-muted bg-accent-light' : 'border-border hover:border-accent-muted'}`}>
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  onChange={onFileChange}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                />
+                <div className="flex flex-col items-center justify-center text-center">
+                  {file ? (
+                    <>
+                      <CheckCircle2 className="w-8 h-8 text-accent mb-2" />
+                      <p className="text-text-primary font-medium text-sm truncate w-full">{file.name}</p>
+                      <p className="text-accent text-xs mt-1">Click or drag to replace</p>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-8 h-8 text-text-muted mb-2" />
+                      <p className="text-text-secondary font-medium text-sm">Click to upload your PDF</p>
+                      <p className="text-text-muted text-xs mt-1">Standard ATS layout preferred</p>
+                    </>
+                  )}
+                </div>
+              </div>
+            ) : (
+              // Build Mode - Show built resume summary
+              <div className={`rounded-xl p-4 transition-all ${builtResume ? 'border-2 border-accent-muted bg-accent-light' : 'border-2 border-dashed border-border'}`}>
+                {builtResume ? (
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-6 h-6 text-accent" />
+                        <div>
+                          <p className="text-text-primary font-medium text-sm">{builtResume.contact.name}</p>
+                          <p className="text-text-muted text-xs">{builtResume.contact.email}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={onBackToBuilder}
+                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-accent border border-accent-muted rounded-lg hover:bg-accent/10 transition-colors"
+                      >
+                        <Edit3 className="w-3 h-3" /> Edit
+                      </button>
+                    </div>
+                    <div className="text-xs text-text-secondary space-y-1">
+                      {builtResume.experience.length > 0 && (
+                        <p>{builtResume.experience.length} work experience{builtResume.experience.length > 1 ? 's' : ''}</p>
+                      )}
+                      {builtResume.education.length > 0 && (
+                        <p>{builtResume.education.length} education entr{builtResume.education.length > 1 ? 'ies' : 'y'}</p>
+                      )}
+                      {(builtResume.skills.core.length + builtResume.skills.tools.length) > 0 && (
+                        <p>{builtResume.skills.core.length + builtResume.skills.tools.length} skills listed</p>
+                      )}
+                    </div>
+                  </div>
                 ) : (
-                  <>
-                    <Upload className="w-8 h-8 text-text-muted mb-2" />
-                    <p className="text-text-secondary font-medium text-sm">Click to upload your PDF</p>
-                    <p className="text-text-muted text-xs mt-1">Standard ATS layout preferred</p>
-                  </>
+                  <div className="flex flex-col items-center justify-center text-center py-4">
+                    <PenTool className="w-8 h-8 text-text-muted mb-2" />
+                    <p className="text-text-secondary font-medium text-sm">No resume built yet</p>
+                    <button
+                      onClick={onBackToBuilder}
+                      className="text-accent text-xs mt-2 hover:underline"
+                    >
+                      Go back to build your resume
+                    </button>
+                  </div>
                 )}
               </div>
-            </div>
+            )}
           </div>
 
           {/* Step 2: Company Name */}
@@ -222,8 +294,8 @@ const InputView: React.FC<InputViewProps> = ({
       {/* Generate Button */}
       <button
         onClick={handleGenerate}
-        disabled={isProcessing}
-        className={`w-full mt-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${isProcessing ? 'bg-accent-light text-accent cursor-not-allowed' : 'bg-accent text-white hover:bg-accent-hover shadow-lg shadow-accent-muted/30'}`}
+        disabled={isProcessing || !hasResume}
+        className={`w-full mt-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${isProcessing || !hasResume ? 'bg-accent-light text-accent cursor-not-allowed' : 'bg-accent text-white hover:bg-accent-hover shadow-lg shadow-accent-muted/30'}`}
       >
         {isProcessing ? (
           <>

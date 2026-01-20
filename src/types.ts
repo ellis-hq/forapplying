@@ -3,14 +3,72 @@ export interface ResumeExperience {
   role: string;
   location: string;
   dateRange: string;
+  startMonth?: string;
+  startYear?: string;
+  endMonth?: string;
+  endYear?: string;
+  isCurrentRole?: boolean;
   bullets: string[];
 }
 
 export interface ResumeEducation {
   school: string;
   degree: string;
+  fieldOfStudy?: string;
   dateRange: string;
+  startMonth?: string;
+  startYear?: string;
+  endMonth?: string;
+  endYear?: string;
+  isInProgress?: boolean;
   location: string;
+}
+
+export interface ResumeProject {
+  name: string;
+  dateRange: string;
+  description: string;
+  technologies: string;
+}
+
+export interface ResumeCertification {
+  name: string;
+  issuer: string;
+  dateObtained: string;
+  expirationDate?: string;
+  noExpiration?: boolean;
+}
+
+export interface ClinicalHoursEntry {
+  siteName: string;
+  role: string;
+  hoursCompleted: number;
+  startMonth?: string;
+  startYear?: string;
+  endMonth?: string;
+  endYear?: string;
+  description?: string;
+}
+
+export interface VolunteerEntry {
+  organization: string;
+  role: string;
+  dateRange: string;
+  description: string;
+}
+
+export interface PublicationEntry {
+  title: string;
+  publication: string;
+  date: string;
+  url?: string;
+}
+
+export interface AwardEntry {
+  title: string;
+  issuer: string;
+  date: string;
+  description?: string;
 }
 
 export interface TailoredResumeData {
@@ -22,12 +80,29 @@ export interface TailoredResumeData {
     linkedin?: string;
   };
   summary: string;
+  objective?: string;
+  includeObjective?: boolean;
   skills: {
     tools: string[];
     core: string[];
   };
   experience: ResumeExperience[];
   education: ResumeEducation[];
+  // Optional sections
+  projects?: ResumeProject[];
+  includeProjects?: boolean;
+  certifications?: ResumeCertification[];
+  includeCertifications?: boolean;
+  clinicalHours?: ClinicalHoursEntry[];
+  includeClinicalHours?: boolean;
+  volunteer?: VolunteerEntry[];
+  includeVolunteer?: boolean;
+  publications?: PublicationEntry[];
+  includePublications?: boolean;
+  languages?: string[];
+  includeLanguages?: boolean;
+  awards?: AwardEntry[];
+  includeAwards?: boolean;
 }
 
 export interface Keyword {
@@ -95,9 +170,17 @@ export const RESUME_STYLES: ResumeStyleInfo[] = [
 
 // View states for the application flow
 export enum AppView {
+  WELCOME = 'welcome',
   INPUT = 'input',
+  BUILDER = 'builder',
   REVIEW = 'review',
   RESULT = 'result'
+}
+
+// Entry mode for how user is creating their resume
+export enum ResumeEntryMode {
+  UPLOAD = 'upload',
+  BUILD = 'build'
 }
 
 // Target section for adding gap suggestions

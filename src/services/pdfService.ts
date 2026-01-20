@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf';
 import * as pdfjsLib from 'pdfjs-dist';
-import { TailoredResumeData, ResumeExperience, ResumeEducation, EditableResumeData, ResumeStyle } from '../types';
+import { TailoredResumeData, ResumeExperience, ResumeEducation, EditableResumeData, ResumeStyle, ResumeProject, ResumeCertification, ClinicalHoursEntry, VolunteerEntry, PublicationEntry, AwardEntry } from '../types';
 
 // Set the worker source
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
@@ -207,7 +207,8 @@ const renderEducation = (b: PDFBuilder, education: ResumeEducation[]) => {
     b.ensureSpace(30);
     b.doc.setFont(CONFIG.font, 'bold');
     b.doc.setFontSize(CONFIG.sizes.body);
-    b.doc.text(edu.degree, CONFIG.margin, b.cursorY);
+    const degreeText = edu.fieldOfStudy ? `${edu.degree} in ${edu.fieldOfStudy}` : edu.degree;
+    b.doc.text(degreeText, CONFIG.margin, b.cursorY);
     const dateWidth = b.doc.getTextWidth(edu.dateRange);
     b.doc.text(edu.dateRange, b.pageWidth - CONFIG.margin - dateWidth, b.cursorY);
     b.cursorY += 13;
@@ -218,6 +219,193 @@ const renderEducation = (b: PDFBuilder, education: ResumeEducation[]) => {
     b.cursorY += 20;
   });
   b.cursorY += CONFIG.spacing.section;
+};
+
+const renderObjective = (b: PDFBuilder, objective: string) => {
+  b.renderSectionHeader('Objective');
+  b.writeParagraph(objective, CONFIG.sizes.body);
+  b.cursorY += CONFIG.spacing.section;
+};
+
+const renderProjects = (b: PDFBuilder, projects: ResumeProject[]) => {
+  if (projects.length === 0) return;
+  b.renderSectionHeader('Projects');
+  projects.forEach(proj => {
+    b.ensureSpace(40);
+    b.doc.setFont(CONFIG.font, 'bold');
+    b.doc.setFontSize(CONFIG.sizes.body);
+    b.doc.text(proj.name, CONFIG.margin, b.cursorY);
+    if (proj.dateRange) {
+      const dateWidth = b.doc.getTextWidth(proj.dateRange);
+      b.doc.text(proj.dateRange, b.pageWidth - CONFIG.margin - dateWidth, b.cursorY);
+    }
+    b.cursorY += 13;
+
+    if (proj.description) {
+      b.writeParagraph(proj.description, CONFIG.sizes.body, 'normal', CONFIG.colors.secondary);
+    }
+    if (proj.technologies) {
+      b.writeParagraph(`Technologies: ${proj.technologies}`, CONFIG.sizes.body, 'italic', CONFIG.colors.secondary);
+    }
+    b.cursorY += 8;
+  });
+  b.cursorY += CONFIG.spacing.section;
+};
+
+const renderCertifications = (b: PDFBuilder, certifications: ResumeCertification[]) => {
+  if (certifications.length === 0) return;
+  b.renderSectionHeader('Certifications');
+  certifications.forEach(cert => {
+    b.ensureSpace(20);
+    b.doc.setFont(CONFIG.font, 'bold');
+    b.doc.setFontSize(CONFIG.sizes.body);
+    const certText = cert.issuer ? `${cert.name}, ${cert.issuer}` : cert.name;
+    b.doc.text(certText, CONFIG.margin, b.cursorY);
+
+    if (cert.dateObtained) {
+      const dateText = cert.noExpiration ? `${cert.dateObtained} (No Expiration)` :
+                       cert.expirationDate ? `${cert.dateObtained} - ${cert.expirationDate}` : cert.dateObtained;
+      const dateWidth = b.doc.getTextWidth(dateText);
+      b.doc.setFont(CONFIG.font, 'normal');
+      b.doc.text(dateText, b.pageWidth - CONFIG.margin - dateWidth, b.cursorY);
+    }
+    b.cursorY += 14;
+  });
+  b.cursorY += CONFIG.spacing.section;
+};
+
+const renderClinicalHours = (b: PDFBuilder, clinicalHours: ClinicalHoursEntry[]) => {
+  if (clinicalHours.length === 0) return;
+  b.renderSectionHeader('Clinical Hours / Practicum');
+  clinicalHours.forEach(entry => {
+    b.ensureSpace(40);
+    b.doc.setFont(CONFIG.font, 'bold');
+    b.doc.setFontSize(CONFIG.sizes.body);
+    b.doc.text(entry.siteName, CONFIG.margin, b.cursorY);
+    const hoursText = `${entry.hoursCompleted} hours`;
+    const hoursWidth = b.doc.getTextWidth(hoursText);
+    b.doc.text(hoursText, b.pageWidth - CONFIG.margin - hoursWidth, b.cursorY);
+    b.cursorY += 13;
+
+    b.doc.setFont(CONFIG.font, 'italic');
+    b.doc.text(entry.role, CONFIG.margin, b.cursorY);
+    b.cursorY += 13;
+
+    if (entry.description) {
+      b.writeParagraph(entry.description, CONFIG.sizes.body, 'normal', CONFIG.colors.secondary);
+    }
+    b.cursorY += 8;
+  });
+  b.cursorY += CONFIG.spacing.section;
+};
+
+const renderVolunteer = (b: PDFBuilder, volunteer: VolunteerEntry[]) => {
+  if (volunteer.length === 0) return;
+  b.renderSectionHeader('Volunteer Work');
+  volunteer.forEach(vol => {
+    b.ensureSpace(40);
+    b.doc.setFont(CONFIG.font, 'bold');
+    b.doc.setFontSize(CONFIG.sizes.body);
+    b.doc.text(vol.organization, CONFIG.margin, b.cursorY);
+    if (vol.dateRange) {
+      const dateWidth = b.doc.getTextWidth(vol.dateRange);
+      b.doc.text(vol.dateRange, b.pageWidth - CONFIG.margin - dateWidth, b.cursorY);
+    }
+    b.cursorY += 13;
+
+    b.doc.setFont(CONFIG.font, 'italic');
+    b.doc.text(vol.role, CONFIG.margin, b.cursorY);
+    b.cursorY += 13;
+
+    if (vol.description) {
+      b.writeParagraph(vol.description, CONFIG.sizes.body, 'normal', CONFIG.colors.secondary);
+    }
+    b.cursorY += 8;
+  });
+  b.cursorY += CONFIG.spacing.section;
+};
+
+const renderPublications = (b: PDFBuilder, publications: PublicationEntry[]) => {
+  if (publications.length === 0) return;
+  b.renderSectionHeader('Publications');
+  publications.forEach(pub => {
+    b.ensureSpace(20);
+    const pubText = `"${pub.title}" - ${pub.publication}, ${pub.date}`;
+    b.writeParagraph(pubText, CONFIG.sizes.body);
+    b.cursorY += 4;
+  });
+  b.cursorY += CONFIG.spacing.section;
+};
+
+const renderLanguages = (b: PDFBuilder, languages: string[]) => {
+  if (languages.length === 0) return;
+  b.renderSectionHeader('Languages');
+  b.writeParagraph(languages.join('  •  '), CONFIG.sizes.body);
+  b.cursorY += CONFIG.spacing.section;
+};
+
+const renderAwards = (b: PDFBuilder, awards: AwardEntry[]) => {
+  if (awards.length === 0) return;
+  b.renderSectionHeader('Awards & Honors');
+  awards.forEach(award => {
+    b.ensureSpace(30);
+    b.doc.setFont(CONFIG.font, 'bold');
+    b.doc.setFontSize(CONFIG.sizes.body);
+    const awardText = award.issuer ? `${award.title}, ${award.issuer}` : award.title;
+    b.doc.text(awardText, CONFIG.margin, b.cursorY);
+    if (award.date) {
+      const dateWidth = b.doc.getTextWidth(award.date);
+      b.doc.setFont(CONFIG.font, 'normal');
+      b.doc.text(award.date, b.pageWidth - CONFIG.margin - dateWidth, b.cursorY);
+    }
+    b.cursorY += 13;
+
+    if (award.description) {
+      b.writeParagraph(award.description, CONFIG.sizes.body, 'normal', CONFIG.colors.secondary);
+    }
+    b.cursorY += 8;
+  });
+  b.cursorY += CONFIG.spacing.section;
+};
+
+/**
+ * Renders optional sections if they exist and are included
+ */
+const renderOptionalSections = (b: PDFBuilder, data: TailoredResumeData) => {
+  // Projects
+  if (data.includeProjects && data.projects && data.projects.length > 0) {
+    renderProjects(b, data.projects);
+  }
+
+  // Certifications
+  if (data.includeCertifications && data.certifications && data.certifications.length > 0) {
+    renderCertifications(b, data.certifications);
+  }
+
+  // Clinical Hours
+  if (data.includeClinicalHours && data.clinicalHours && data.clinicalHours.length > 0) {
+    renderClinicalHours(b, data.clinicalHours);
+  }
+
+  // Volunteer
+  if (data.includeVolunteer && data.volunteer && data.volunteer.length > 0) {
+    renderVolunteer(b, data.volunteer);
+  }
+
+  // Publications
+  if (data.includePublications && data.publications && data.publications.length > 0) {
+    renderPublications(b, data.publications);
+  }
+
+  // Languages
+  if (data.includeLanguages && data.languages && data.languages.length > 0) {
+    renderLanguages(b, data.languages);
+  }
+
+  // Awards
+  if (data.includeAwards && data.awards && data.awards.length > 0) {
+    renderAwards(b, data.awards);
+  }
 };
 
 /**
@@ -235,38 +423,48 @@ export function generateATSPDF(data: TailoredResumeData | EditableResumeData): j
   // Always render header first
   renderHeader(builder, data.contact, jobTitle);
 
-  // Always render summary second
-  renderSummary(builder, data.summary);
+  // Render objective if included
+  if (data.includeObjective && data.objective) {
+    renderObjective(builder, data.objective);
+  }
+
+  // Always render summary
+  if (data.summary) {
+    renderSummary(builder, data.summary);
+  }
 
   // Render remaining sections based on style
   switch (style) {
     case ResumeStyle.CLASSIC:
       // Classic: Experience → Education → Skills
-      renderExperience(builder, data.experience);
-      renderEducation(builder, data.education);
-      renderSkills(builder, data.skills);
+      if (data.experience.length > 0) renderExperience(builder, data.experience);
+      if (data.education.length > 0) renderEducation(builder, data.education);
+      if (data.skills.core.length > 0 || data.skills.tools.length > 0) renderSkills(builder, data.skills);
       break;
 
     case ResumeStyle.HYBRID:
       // Hybrid: Skills → Experience → Education
-      renderSkills(builder, data.skills);
-      renderExperience(builder, data.experience);
-      renderEducation(builder, data.education);
+      if (data.skills.core.length > 0 || data.skills.tools.length > 0) renderSkills(builder, data.skills);
+      if (data.experience.length > 0) renderExperience(builder, data.experience);
+      if (data.education.length > 0) renderEducation(builder, data.education);
       break;
 
     case ResumeStyle.TECHNICAL:
       // Technical/Early-Career: Education → Skills → Experience
-      renderEducation(builder, data.education);
-      renderSkills(builder, data.skills);
-      renderExperience(builder, data.experience);
+      if (data.education.length > 0) renderEducation(builder, data.education);
+      if (data.skills.core.length > 0 || data.skills.tools.length > 0) renderSkills(builder, data.skills);
+      if (data.experience.length > 0) renderExperience(builder, data.experience);
       break;
 
     default:
       // Default to classic order
-      renderExperience(builder, data.experience);
-      renderEducation(builder, data.education);
-      renderSkills(builder, data.skills);
+      if (data.experience.length > 0) renderExperience(builder, data.experience);
+      if (data.education.length > 0) renderEducation(builder, data.education);
+      if (data.skills.core.length > 0 || data.skills.tools.length > 0) renderSkills(builder, data.skills);
   }
+
+  // Render optional sections
+  renderOptionalSections(builder, data);
 
   return doc;
 }
