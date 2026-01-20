@@ -1,0 +1,27 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "functions": {
+    "api/tailor.js": {
+      "maxDuration": 60
+    },
+    "api/gap-suggestion.js": {
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/tailor",
+      "destination": "/api/tailor"
+    },
+    {
+      "source": "/api/gap-suggestion",
+      "destination": "/api/gap-suggestion"
+    },
+    {
+      "source": "/api/health",
+      "destination": "/api/health"
+    }
+  ]
+}
