@@ -1,10 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
 
-// Initialize Anthropic client
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
-
 function sanitizeString(str) {
   if (typeof str !== 'string') return '';
   return str
@@ -94,6 +89,11 @@ export default async function handler(req, res) {
     console.error('ANTHROPIC_API_KEY not configured');
     return res.status(500).json({ error: 'Service configuration error. Please contact support.' });
   }
+
+  // Initialize Anthropic client inside the handler
+  const anthropic = new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY,
+  });
 
   // Validate request
   const validationError = validateRequest(req.body);
