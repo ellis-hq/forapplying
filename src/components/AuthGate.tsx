@@ -214,7 +214,7 @@ export default function AuthGate({ children }: AuthGateProps) {
         <div className="w-full max-w-md">
           <div className="bg-white rounded-2xl shadow-xl p-8">
             <div className="text-center mb-8">
-              <h1 className="text-3xl font-bold text-gray-900">Welcome to Forapply</h1>
+              <h1 className="text-3xl font-bold text-gray-900">Welcome to Forapplying</h1>
               <p className="text-gray-600 mt-3 text-sm leading-relaxed">
                 Optimize your resume to get past ATS systems and land more interviews. Free users get 5 downloads per day.
               </p>
@@ -364,7 +364,7 @@ export default function AuthGate({ children }: AuthGateProps) {
         <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
-              <h1 className="text-xl font-bold text-gray-900">Forapply</h1>
+              <h1 className="text-xl font-bold text-gray-900">Forapplying</h1>
 
               <div className="flex items-center gap-6">
                 <div className="hidden sm:block">

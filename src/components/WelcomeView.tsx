@@ -23,7 +23,7 @@ const WelcomeView: React.FC<WelcomeViewProps> = ({ onSelectMode }) => {
       {/* Welcome Header */}
       <div className="text-center mb-8">
         <h1 className="text-2xl md:text-3xl font-bold text-text-primary mb-3">
-          Welcome to Forapply
+          Welcome to Forapplying
         </h1>
         <p className="text-text-secondary text-sm md:text-base max-w-lg mx-auto">
           Get your resume past ATS filters and in front of recruiters. Choose how you'd like to start:

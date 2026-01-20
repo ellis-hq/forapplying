@@ -1,13 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Download,
   XCircle,
   Target,
   FileBadge,
   FileText,
-  Loader2
+  Loader2,
+  CheckCircle,
+  AlertTriangle,
+  Calendar
 } from 'lucide-react';
-import { TailorResponse } from '../types';
+import { TailorResponse, EmploymentGap, EmploymentGapResolutionState, EditableResumeData } from '../types';
+import { generateGapSummary } from '../utils/employmentGapDetector';
 
 interface ResultViewProps {
   result: TailorResponse;
@@ -15,6 +19,8 @@ interface ResultViewProps {
   downloadResume: () => Promise<void>;
   downloadCoverLetter: () => Promise<void>;
   company: string;
+  employmentGaps?: EmploymentGap[];
+  gapResolutions?: EmploymentGapResolutionState[];
 }
 
 const ScoreCircle: React.FC<{ score: number }> = ({ score }) => (
@@ -32,9 +38,17 @@ const ResultView: React.FC<ResultViewProps> = ({
   matchScore,
   downloadResume,
   downloadCoverLetter,
+  employmentGaps = [],
+  gapResolutions = [],
 }) => {
   const [isDownloadingResume, setIsDownloadingResume] = useState(false);
   const [isDownloadingCoverLetter, setIsDownloadingCoverLetter] = useState(false);
+
+  // Compute employment gap summary
+  const gapSummary = useMemo(() =>
+    generateGapSummary(employmentGaps, gapResolutions),
+    [employmentGaps, gapResolutions]
+  );
 
   const handleDownloadResume = async () => {
     setIsDownloadingResume(true);
@@ -94,7 +108,7 @@ const ResultView: React.FC<ResultViewProps> = ({
             {result.report.gaps.length > 0 && (
               <div>
                 <h3 className="text-xs font-semibold text-error uppercase tracking-wider mb-3 flex items-center gap-2">
-                  <XCircle className="w-3 h-3" /> Remaining Gaps
+                  <XCircle className="w-3 h-3" /> Remaining Skill Gaps
                 </h3>
                 <div className="flex flex-wrap gap-1.5">
                   {result.report.gaps.map((gap, i) => (
@@ -102,6 +116,42 @@ const ResultView: React.FC<ResultViewProps> = ({
                       {gap}
                     </span>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Employment Gap Summary */}
+            {employmentGaps.length > 0 && (
+              <div className="pt-4 border-t border-border">
+                <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <Calendar className="w-3 h-3 text-warning" />
+                  <span className={gapSummary.allAddressed ? 'text-success' : 'text-warning'}>
+                    Employment Gaps
+                  </span>
+                </h3>
+                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
+                  gapSummary.allAddressed
+                    ? 'bg-success-light border border-success-border'
+                    : gapSummary.remainingGaps.length > 0
+                    ? 'bg-warning-light border border-warning-border'
+                    : 'bg-border-light border border-border'
+                }`}>
+                  {gapSummary.allAddressed ? (
+                    <CheckCircle className="w-4 h-4 text-success" />
+                  ) : gapSummary.remainingGaps.length > 0 ? (
+                    <AlertTriangle className="w-4 h-4 text-warning" />
+                  ) : (
+                    <CheckCircle className="w-4 h-4 text-text-muted" />
+                  )}
+                  <span className={`text-xs font-medium ${
+                    gapSummary.allAddressed
+                      ? 'text-success'
+                      : gapSummary.remainingGaps.length > 0
+                      ? 'text-warning'
+                      : 'text-text-muted'
+                  }`}>
+                    {gapSummary.summaryText}
+                  </span>
                 </div>
               </div>
             )}
@@ -151,6 +201,9 @@ const ResultView: React.FC<ResultViewProps> = ({
             <div className="w-full max-w-[700px] shadow-sm border border-border p-12 bg-surface text-text-primary text-[11px] leading-relaxed">
               <div className="text-center mb-8">
                 <h1 className="text-2xl font-bold uppercase mb-1 tracking-tight">{result.resume.contact.name}</h1>
+                {(result.resume as EditableResumeData).jobTitle && (
+                  <p className="text-sm text-text-secondary mb-1">{(result.resume as EditableResumeData).jobTitle}</p>
+                )}
                 <p className="text-text-muted">
                   {result.resume.contact.email} • {result.resume.contact.phone} • {result.resume.contact.location}
                 </p>
@@ -209,6 +262,50 @@ const ResultView: React.FC<ResultViewProps> = ({
                   ))}
                 </div>
               </div>
+
+              {/* Projects Section */}
+              {result.resume.includeProjects && result.resume.projects && result.resume.projects.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-xs font-bold uppercase border-b border-text-primary pb-0.5 mb-2">
+                    Projects
+                  </h3>
+                  <div className="space-y-3">
+                    {result.resume.projects.map((proj, i) => (
+                      <div key={i}>
+                        <div className="flex justify-between items-baseline mb-0.5">
+                          <h4 className="font-bold text-sm">{proj.name}</h4>
+                          <span className="font-bold italic text-xs">{proj.dateRange}</span>
+                        </div>
+                        <p className="text-text-secondary text-xs">{proj.description}</p>
+                        {proj.technologies && (
+                          <p className="text-text-muted text-xs mt-1">Technologies: {proj.technologies}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Volunteer Section */}
+              {result.resume.includeVolunteer && result.resume.volunteer && result.resume.volunteer.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-xs font-bold uppercase border-b border-text-primary pb-0.5 mb-2">
+                    Volunteer Work
+                  </h3>
+                  <div className="space-y-3">
+                    {result.resume.volunteer.map((vol, i) => (
+                      <div key={i}>
+                        <div className="flex justify-between items-baseline mb-0.5">
+                          <h4 className="font-bold text-sm uppercase">{vol.organization}</h4>
+                          <span className="font-bold italic text-xs">{vol.dateRange}</span>
+                        </div>
+                        <p className="italic text-text-secondary text-xs">{vol.role}</p>
+                        <p className="text-text-muted text-xs mt-1">{vol.description}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="w-full max-w-[700px] mt-12 mb-8 bg-border-light p-10 border border-border rounded-lg">

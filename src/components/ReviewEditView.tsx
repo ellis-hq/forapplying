@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Sparkles,
   PenLine,
@@ -9,16 +9,35 @@ import {
   X,
   Pencil,
   AlertCircle,
-  Lightbulb
+  Lightbulb,
+  Calendar
 } from 'lucide-react';
-import { TailorResponse, GapState, GapTargetSection, EditableResumeData, ResumeStyle } from '../types';
+import {
+  TailorResponse,
+  GapState,
+  GapTargetSection,
+  EditableResumeData,
+  ResumeStyle,
+  EmploymentGap,
+  EmploymentGapResolutionState,
+  EmploymentGapResolutionType,
+  EmploymentGapSuggestion,
+  ResumeProject,
+  ResumeExperience,
+  ResumeEducation,
+  VolunteerEntry
+} from '../types';
+import { detectEmploymentGaps, generateGapSummary } from '../utils/employmentGapDetector';
+import EmploymentGapAlert from './EmploymentGapAlert';
+import GapResolutionForm from './GapResolutionForm';
 
 interface ReviewEditViewProps {
   result: TailorResponse;
   jobDescription: string;
   resumeStyle: ResumeStyle;
   onGenerateSuggestion: (skill: string, targetSection: GapTargetSection) => Promise<string>;
-  onContinue: (editedResume: EditableResumeData) => void;
+  onGenerateEmploymentGapSuggestions: (gap: EmploymentGap) => Promise<EmploymentGapSuggestion[]>;
+  onContinue: (editedResume: EditableResumeData, employmentGaps: EmploymentGap[], gapResolutions: EmploymentGapResolutionState[]) => void;
   onEditResume?: () => void;
 }
 
@@ -27,6 +46,7 @@ const ReviewEditView: React.FC<ReviewEditViewProps> = ({
   jobDescription,
   resumeStyle,
   onGenerateSuggestion,
+  onGenerateEmploymentGapSuggestions,
   onContinue,
   onEditResume
 }) => {
@@ -37,7 +57,7 @@ const ReviewEditView: React.FC<ReviewEditViewProps> = ({
     resumeStyle
   }));
 
-  // Gap states
+  // Skill Gap states
   const [gapStates, setGapStates] = useState<GapState[]>(() =>
     result.report.gaps.map(gap => ({
       skill: gap,
@@ -45,9 +65,34 @@ const ReviewEditView: React.FC<ReviewEditViewProps> = ({
     }))
   );
 
-  // Currently active gap index
+  // Currently active skill gap index
   const [activeGapIndex, setActiveGapIndex] = useState<number | null>(
     result.report.gaps.length > 0 ? 0 : null
+  );
+
+  // Employment Gap Detection
+  const [employmentGaps] = useState<EmploymentGap[]>(() =>
+    detectEmploymentGaps(result.resume.experience, result.resume.education)
+  );
+
+  const [employmentGapResolutions, setEmploymentGapResolutions] = useState<EmploymentGapResolutionState[]>(() =>
+    employmentGaps.map(gap => ({
+      gapId: gap.id,
+      status: 'pending' as const
+    }))
+  );
+
+  // Employment gap resolution form state
+  const [activeGapForm, setActiveGapForm] = useState<{
+    gap: EmploymentGap;
+    type: EmploymentGapResolutionType;
+    prefillData?: { title?: string; description?: string };
+  } | null>(null);
+
+  // Computed employment gap summary
+  const employmentGapSummary = useMemo(() =>
+    generateGapSummary(employmentGaps, employmentGapResolutions),
+    [employmentGaps, employmentGapResolutions]
   );
 
   // Job title editing
@@ -93,6 +138,8 @@ const ReviewEditView: React.FC<ReviewEditViewProps> = ({
 
     if (!textToAdd?.trim()) return;
 
+    const trimmedText = textToAdd.trim();
+
     // Apply the suggestion to the resume
     setEditedResume(prev => {
       const updated = { ...prev };
@@ -100,18 +147,18 @@ const ReviewEditView: React.FC<ReviewEditViewProps> = ({
         case 'skills':
           updated.skills = {
             ...updated.skills,
-            core: [...updated.skills.core, textToAdd.trim()]
+            core: [...updated.skills.core, trimmedText]
           };
           break;
         case 'summary':
-          updated.summary = `${updated.summary} ${textToAdd.trim()}`;
+          updated.summary = `${updated.summary} ${trimmedText}`;
           break;
         case 'experience':
           const expIndex = gap.targetExperienceIndex ?? 0;
           if (updated.experience[expIndex]) {
             updated.experience = updated.experience.map((exp, i) =>
               i === expIndex
-                ? { ...exp, bullets: [...exp.bullets, textToAdd.trim()] }
+                ? { ...exp, bullets: [...exp.bullets, trimmedText] }
                 : exp
             );
           }
@@ -120,9 +167,58 @@ const ReviewEditView: React.FC<ReviewEditViewProps> = ({
       return updated;
     });
 
-    updateGapState(index, { status: 'accepted' });
+    // Store the added content so we can remove it on undo
+    updateGapState(index, { status: 'accepted', addedContent: trimmedText });
     setManualText('');
     moveToNextGap(index);
+  };
+
+  const handleUndoAccepted = (index: number) => {
+    const gap = gapStates[index];
+    const section = gap.targetSection || 'skills';
+    const addedContent = gap.addedContent;
+
+    if (!addedContent) {
+      // No content tracked, just reset to pending
+      updateGapState(index, { status: 'pending', suggestion: undefined, addedContent: undefined });
+      return;
+    }
+
+    // Remove the previously added content from the resume
+    setEditedResume(prev => {
+      const updated = { ...prev };
+      switch (section) {
+        case 'skills':
+          updated.skills = {
+            ...updated.skills,
+            core: updated.skills.core.filter(skill => skill !== addedContent)
+          };
+          break;
+        case 'summary':
+          // Remove the appended text from summary
+          updated.summary = updated.summary.replace(` ${addedContent}`, '').replace(addedContent, '');
+          break;
+        case 'experience':
+          const expIndex = gap.targetExperienceIndex ?? 0;
+          if (updated.experience[expIndex]) {
+            updated.experience = updated.experience.map((exp, i) =>
+              i === expIndex
+                ? { ...exp, bullets: exp.bullets.filter(b => b !== addedContent) }
+                : exp
+            );
+          }
+          break;
+      }
+      return updated;
+    });
+
+    // Reset the gap to editing state with the previous content pre-filled
+    updateGapState(index, {
+      status: 'editing',
+      suggestion: addedContent,
+      addedContent: undefined
+    });
+    setActiveGapIndex(index);
   };
 
   const handleDiscard = (index: number) => {
@@ -146,6 +242,205 @@ const ReviewEditView: React.FC<ReviewEditViewProps> = ({
   const handleSaveJobTitle = () => {
     setEditedResume(prev => ({ ...prev, jobTitle: tempJobTitle }));
     setIsEditingTitle(false);
+  };
+
+  // Employment Gap Handlers
+  const updateEmploymentGapResolution = (gapId: string, updates: Partial<EmploymentGapResolutionState>) => {
+    setEmploymentGapResolutions(prev =>
+      prev.map(r => r.gapId === gapId ? { ...r, ...updates } : r)
+    );
+  };
+
+  const handleEmploymentGapResolve = (gapId: string, type: EmploymentGapResolutionType) => {
+    const gap = employmentGaps.find(g => g.id === gapId);
+    if (!gap) return;
+    setActiveGapForm({ gap, type });
+  };
+
+  const handleEmploymentGapDismiss = (gapId: string) => {
+    updateEmploymentGapResolution(gapId, {
+      status: 'dismissed',
+      resolutionType: 'dismissed'
+    });
+  };
+
+  const handleEmploymentGapAISuggest = async (gapId: string) => {
+    const gap = employmentGaps.find(g => g.id === gapId);
+    if (!gap) return;
+
+    updateEmploymentGapResolution(gapId, { status: 'suggesting' });
+
+    try {
+      const suggestions = await onGenerateEmploymentGapSuggestions(gap);
+      updateEmploymentGapResolution(gapId, {
+        status: 'pending',
+        aiSuggestions: suggestions
+      });
+    } catch (error) {
+      console.error('Failed to generate employment gap suggestions:', error);
+      updateEmploymentGapResolution(gapId, { status: 'pending' });
+    }
+  };
+
+  const handleSelectEmploymentGapSuggestion = (gapId: string, suggestion: EmploymentGapSuggestion) => {
+    const gap = employmentGaps.find(g => g.id === gapId);
+    if (!gap) return;
+
+    setActiveGapForm({
+      gap,
+      type: suggestion.type,
+      prefillData: { title: suggestion.title, description: suggestion.description }
+    });
+  };
+
+  const handleGapFormSubmit = (
+    type: EmploymentGapResolutionType,
+    data: ResumeProject | ResumeExperience | ResumeEducation | VolunteerEntry
+  ) => {
+    if (!activeGapForm) return;
+
+    setEditedResume(prev => {
+      const updated = { ...prev };
+
+      switch (type) {
+        case 'project':
+          updated.projects = [...(updated.projects || []), data as ResumeProject];
+          updated.includeProjects = true;
+          break;
+        case 'freelance':
+          // Insert the experience in chronological order
+          const newExp = data as ResumeExperience;
+          const experiences = [...updated.experience];
+          // Find the right position based on start date
+          let insertIndex = experiences.length;
+          for (let i = 0; i < experiences.length; i++) {
+            const exp = experiences[i];
+            const expYear = parseInt(exp.startYear || '0', 10);
+            const newExpYear = parseInt(newExp.startYear || '0', 10);
+            if (newExpYear > expYear) {
+              insertIndex = i;
+              break;
+            }
+          }
+          experiences.splice(insertIndex, 0, newExp);
+          updated.experience = experiences;
+          break;
+        case 'education':
+          updated.education = [...updated.education, data as ResumeEducation];
+          break;
+        case 'volunteer':
+          updated.volunteer = [...(updated.volunteer || []), data as VolunteerEntry];
+          updated.includeVolunteer = true;
+          break;
+      }
+
+      return updated;
+    });
+
+    // Mark the gap as resolved and store the added data for undo
+    updateEmploymentGapResolution(activeGapForm.gap.id, {
+      status: 'resolved',
+      resolutionType: type,
+      addedData: data
+    });
+
+    setActiveGapForm(null);
+  };
+
+  const handleUndoEmploymentGap = (gapId: string) => {
+    const resolution = employmentGapResolutions.find(r => r.gapId === gapId);
+    if (!resolution || !resolution.addedData || !resolution.resolutionType) {
+      // No data to undo, just reset to pending
+      updateEmploymentGapResolution(gapId, {
+        status: 'pending',
+        resolutionType: undefined,
+        addedData: undefined
+      });
+      return;
+    }
+
+    // Remove the previously added data from the resume
+    setEditedResume(prev => {
+      const updated = { ...prev };
+
+      switch (resolution.resolutionType) {
+        case 'project':
+          const projectData = resolution.addedData as ResumeProject;
+          updated.projects = (updated.projects || []).filter(
+            p => p.name !== projectData.name || p.dateRange !== projectData.dateRange
+          );
+          if (updated.projects.length === 0) {
+            updated.includeProjects = false;
+          }
+          break;
+        case 'freelance':
+          const expData = resolution.addedData as ResumeExperience;
+          updated.experience = updated.experience.filter(
+            e => e.company !== expData.company || e.role !== expData.role || e.dateRange !== expData.dateRange
+          );
+          break;
+        case 'education':
+          const eduData = resolution.addedData as ResumeEducation;
+          updated.education = updated.education.filter(
+            e => e.school !== eduData.school || e.degree !== eduData.degree || e.dateRange !== eduData.dateRange
+          );
+          break;
+        case 'volunteer':
+          const volData = resolution.addedData as VolunteerEntry;
+          updated.volunteer = (updated.volunteer || []).filter(
+            v => v.organization !== volData.organization || v.role !== volData.role || v.dateRange !== volData.dateRange
+          );
+          if (updated.volunteer.length === 0) {
+            updated.includeVolunteer = false;
+          }
+          break;
+      }
+
+      return updated;
+    });
+
+    // Open the form with the previous data pre-filled
+    const gap = employmentGaps.find(g => g.id === gapId);
+    if (gap && resolution.resolutionType !== 'dismissed') {
+      // Get prefill data based on the resolution type
+      let prefillData: { title?: string; description?: string } | undefined;
+
+      switch (resolution.resolutionType) {
+        case 'project':
+          const proj = resolution.addedData as ResumeProject;
+          prefillData = { title: proj.name, description: proj.description };
+          break;
+        case 'freelance':
+          const exp = resolution.addedData as ResumeExperience;
+          prefillData = { title: `${exp.role} at ${exp.company}`, description: exp.bullets.join('\n') };
+          break;
+        case 'education':
+          const edu = resolution.addedData as ResumeEducation;
+          prefillData = { title: `${edu.degree} at ${edu.school}` };
+          break;
+        case 'volunteer':
+          const vol = resolution.addedData as VolunteerEntry;
+          prefillData = { title: `${vol.role} at ${vol.organization}`, description: vol.description };
+          break;
+      }
+
+      setActiveGapForm({
+        gap,
+        type: resolution.resolutionType,
+        prefillData
+      });
+    }
+
+    // Reset the resolution state
+    updateEmploymentGapResolution(gapId, {
+      status: 'pending',
+      resolutionType: undefined,
+      addedData: undefined
+    });
+  };
+
+  const handleGapFormCancel = () => {
+    setActiveGapForm(null);
   };
 
   const pendingGaps = gapStates.filter(g => g.status === 'pending').length;
@@ -246,10 +541,68 @@ const ReviewEditView: React.FC<ReviewEditViewProps> = ({
                   onAccept={handleAcceptSuggestion}
                   onDiscard={handleDiscard}
                   onUpdateGap={updateGapState}
+                  onUndo={handleUndoAccepted}
                 />
               ))}
             </div>
           </div>
+        )}
+
+        {/* Employment Gap Cards */}
+        {employmentGaps.length > 0 && (
+          <div className="bg-surface p-6 rounded-2xl shadow-sm border border-border">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-bold text-text-primary flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-warning" />
+                Employment Gaps
+              </h2>
+              <span className="text-xs text-text-muted">
+                {employmentGapSummary.addressedGaps}/{employmentGapSummary.totalGaps} addressed
+              </span>
+            </div>
+
+            <p className="text-xs text-text-muted mb-4">
+              We detected gaps between your jobs. Addressing them can strengthen your application.
+            </p>
+
+            {/* Progress indicator */}
+            <div className="w-full bg-border-light rounded-full h-1.5 mb-6">
+              <div
+                className="bg-warning h-1.5 rounded-full transition-all duration-300"
+                style={{ width: `${(employmentGapSummary.addressedGaps / employmentGapSummary.totalGaps) * 100}%` }}
+              />
+            </div>
+
+            {/* Gap Alert Cards */}
+            <div className="space-y-4">
+              {employmentGaps.map(gap => {
+                const resolution = employmentGapResolutions.find(r => r.gapId === gap.id)!;
+                return (
+                  <EmploymentGapAlert
+                    key={gap.id}
+                    gap={gap}
+                    resolution={resolution}
+                    onResolve={handleEmploymentGapResolve}
+                    onDismiss={handleEmploymentGapDismiss}
+                    onAISuggest={handleEmploymentGapAISuggest}
+                    onSelectSuggestion={handleSelectEmploymentGapSuggestion}
+                    onUndo={handleUndoEmploymentGap}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Gap Resolution Form Modal */}
+        {activeGapForm && (
+          <GapResolutionForm
+            gap={activeGapForm.gap}
+            resolutionType={activeGapForm.type}
+            prefillData={activeGapForm.prefillData}
+            onSubmit={handleGapFormSubmit}
+            onCancel={handleGapFormCancel}
+          />
         )}
 
         {/* Edit Resume Button */}
@@ -265,7 +618,7 @@ const ReviewEditView: React.FC<ReviewEditViewProps> = ({
 
         {/* Continue Button */}
         <button
-          onClick={() => onContinue(editedResume)}
+          onClick={() => onContinue(editedResume, employmentGaps, employmentGapResolutions)}
           className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-accent hover:bg-accent-hover text-white rounded-xl text-sm font-bold shadow-sm transition-all"
         >
           Continue to Download
@@ -371,6 +724,50 @@ const ReviewEditView: React.FC<ReviewEditViewProps> = ({
                   ))}
                 </div>
               </div>
+
+              {/* Projects Section */}
+              {editedResume.includeProjects && editedResume.projects && editedResume.projects.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-xs font-bold uppercase border-b border-text-primary pb-0.5 mb-2">
+                    Projects
+                  </h3>
+                  <div className="space-y-3">
+                    {editedResume.projects.map((proj, i) => (
+                      <div key={i}>
+                        <div className="flex justify-between items-baseline mb-0.5">
+                          <h4 className="font-bold text-sm">{proj.name}</h4>
+                          <span className="font-bold italic text-xs">{proj.dateRange}</span>
+                        </div>
+                        <p className="text-text-secondary text-xs">{proj.description}</p>
+                        {proj.technologies && (
+                          <p className="text-text-muted text-xs mt-1">Technologies: {proj.technologies}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Volunteer Section */}
+              {editedResume.includeVolunteer && editedResume.volunteer && editedResume.volunteer.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-xs font-bold uppercase border-b border-text-primary pb-0.5 mb-2">
+                    Volunteer Work
+                  </h3>
+                  <div className="space-y-3">
+                    {editedResume.volunteer.map((vol, i) => (
+                      <div key={i}>
+                        <div className="flex justify-between items-baseline mb-0.5">
+                          <h4 className="font-bold text-sm uppercase">{vol.organization}</h4>
+                          <span className="font-bold italic text-xs">{vol.dateRange}</span>
+                        </div>
+                        <p className="italic text-text-secondary text-xs">{vol.role}</p>
+                        <p className="text-text-muted text-xs mt-1">{vol.description}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -394,6 +791,7 @@ interface GapCardProps {
   onAccept: (index: number) => void;
   onDiscard: (index: number) => void;
   onUpdateGap: (index: number, updates: Partial<GapState>) => void;
+  onUndo: (index: number) => void;
 }
 
 const GapCard: React.FC<GapCardProps> = ({
@@ -409,7 +807,8 @@ const GapCard: React.FC<GapCardProps> = ({
   onSkip,
   onAccept,
   onDiscard,
-  onUpdateGap
+  onUpdateGap,
+  onUndo
 }) => {
   const [selectedSection, setSelectedSection] = useState<GapTargetSection>('skills');
   const [selectedExpIndex, setSelectedExpIndex] = useState(0);
@@ -420,7 +819,13 @@ const GapCard: React.FC<GapCardProps> = ({
         <div className="flex items-center gap-2">
           <Check className="w-4 h-4 text-success" />
           <span className="text-sm font-medium text-success">{gap.skill}</span>
-          <span className="text-xs text-success ml-auto">Added</span>
+          <button
+            onClick={() => onUndo(index)}
+            className="ml-auto flex items-center gap-1 px-2 py-1 text-xs text-success hover:text-success hover:bg-success/10 rounded transition-colors"
+          >
+            <Pencil className="w-3 h-3" />
+            Edit
+          </button>
         </div>
       </div>
     );
@@ -428,11 +833,17 @@ const GapCard: React.FC<GapCardProps> = ({
 
   if (gap.status === 'skipped') {
     return (
-      <div className="p-3 rounded-lg bg-border-light border border-border opacity-60">
+      <div className="p-3 rounded-lg bg-border-light border border-border opacity-60 hover:opacity-100 transition-opacity">
         <div className="flex items-center gap-2">
           <SkipForward className="w-4 h-4 text-text-muted" />
           <span className="text-sm font-medium text-text-muted">{gap.skill}</span>
-          <span className="text-xs text-text-muted ml-auto">Skipped</span>
+          <button
+            onClick={() => onUndo(index)}
+            className="ml-auto flex items-center gap-1 px-2 py-1 text-xs text-text-muted hover:text-text-secondary hover:bg-border rounded transition-colors"
+          >
+            <X className="w-3 h-3" />
+            Undo
+          </button>
         </div>
       </div>
     );

@@ -194,10 +194,41 @@ export interface GapState {
   manualText?: string;
   targetSection?: GapTargetSection;
   targetExperienceIndex?: number; // Which experience entry to add to (if section is 'experience')
+  addedContent?: string; // Track what was added so we can remove it on undo
 }
 
 // Editable resume data extends the base with a job title and style
 export interface EditableResumeData extends TailoredResumeData {
   jobTitle?: string;
   resumeStyle?: ResumeStyle;
+}
+
+// Employment Gap Detection Types
+export interface EmploymentGap {
+  id: string;
+  startDate: { month: number; year: number; };
+  endDate: { month: number; year: number; };
+  durationMonths: number;
+  previousJob: { company: string; role: string; endDate: string; };
+  nextJob: { company: string; role: string; startDate: string; };
+  isOldGap: boolean;  // 10+ years ago
+  isCoveredByEducation: boolean;
+  educationCoverage?: { school: string; degree: string; };
+}
+
+export type EmploymentGapResolutionStatus = 'pending' | 'suggesting' | 'resolved' | 'dismissed';
+export type EmploymentGapResolutionType = 'project' | 'freelance' | 'education' | 'volunteer' | 'dismissed';
+
+export interface EmploymentGapResolutionState {
+  gapId: string;
+  status: EmploymentGapResolutionStatus;
+  resolutionType?: EmploymentGapResolutionType;
+  aiSuggestions?: Array<{ type: string; title: string; description: string; }>;
+  addedData?: ResumeProject | ResumeExperience | ResumeEducation | VolunteerEntry; // Track what was added for undo
+}
+
+export interface EmploymentGapSuggestion {
+  type: EmploymentGapResolutionType;
+  title: string;
+  description: string;
 }

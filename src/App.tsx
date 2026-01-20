@@ -1,8 +1,20 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { User } from '@supabase/supabase-js';
 import { extractTextFromPDF, generateATSPDF, generateCoverLetterPDF } from './services/pdfService';
-import { tailorResume as tailorResumeAPI, generateGapSuggestion } from './services/claudeService';
-import { TailorResponse, RewriteMode, AppView, EditableResumeData, GapTargetSection, ResumeStyle, TailoredResumeData, ResumeEntryMode } from './types';
+import { tailorResume as tailorResumeAPI, generateGapSuggestion, generateEmploymentGapSuggestions } from './services/claudeService';
+import {
+  TailorResponse,
+  RewriteMode,
+  AppView,
+  EditableResumeData,
+  GapTargetSection,
+  ResumeStyle,
+  TailoredResumeData,
+  ResumeEntryMode,
+  EmploymentGap,
+  EmploymentGapResolutionState,
+  EmploymentGapSuggestion
+} from './types';
 import { UserProfile } from './lib/supabase';
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -32,6 +44,8 @@ const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }
   const [editedResume, setEditedResume] = useState<EditableResumeData | null>(null);
   const [entryMode, setEntryMode] = useState<ResumeEntryMode | null>(null);
   const [builtResume, setBuiltResume] = useState<TailoredResumeData | null>(null);
+  const [employmentGaps, setEmploymentGaps] = useState<EmploymentGap[]>([]);
+  const [gapResolutions, setGapResolutions] = useState<EmploymentGapResolutionState[]>([]);
 
   const matchScore = useMemo(() => {
     if (!result) return 0;
@@ -254,6 +268,8 @@ const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }
     setEditedResume(null);
     setEntryMode(null);
     setBuiltResume(null);
+    setEmploymentGaps([]);
+    setGapResolutions([]);
   };
 
   // Handler for selecting entry mode from welcome screen
@@ -298,9 +314,21 @@ const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }
     return generateGapSuggestion(skill, result.resume, targetSection, jobDesc);
   }, [result, jobDesc]);
 
+  // Handler for generating employment gap suggestions
+  const handleGenerateEmploymentGapSuggestions = useCallback(async (gap: EmploymentGap): Promise<EmploymentGapSuggestion[]> => {
+    if (!result) throw new Error('No resume data available');
+    return generateEmploymentGapSuggestions(gap, result.resume, jobDesc);
+  }, [result, jobDesc]);
+
   // Handler for continuing from review to result view
-  const handleContinueFromReview = useCallback((edited: EditableResumeData) => {
+  const handleContinueFromReview = useCallback((
+    edited: EditableResumeData,
+    gaps: EmploymentGap[],
+    resolutions: EmploymentGapResolutionState[]
+  ) => {
     setEditedResume(edited);
+    setEmploymentGaps(gaps);
+    setGapResolutions(resolutions);
     setCurrentView(AppView.RESULT);
   }, []);
 
@@ -360,6 +388,7 @@ const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }
           jobDescription={jobDesc}
           resumeStyle={resumeStyle}
           onGenerateSuggestion={handleGenerateSuggestion}
+          onGenerateEmploymentGapSuggestions={handleGenerateEmploymentGapSuggestions}
           onContinue={handleContinueFromReview}
           onEditResume={handleEditResume}
         />
@@ -372,6 +401,8 @@ const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }
           downloadResume={downloadResume}
           downloadCoverLetter={downloadCoverLetter}
           company={company}
+          employmentGaps={employmentGaps}
+          gapResolutions={gapResolutions}
         />
       )}
 

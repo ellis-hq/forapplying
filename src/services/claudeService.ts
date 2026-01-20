@@ -1,4 +1,4 @@
-import { TailorResponse, RewriteMode, TailoredResumeData, GapTargetSection, ResumeStyle } from "../types";
+import { TailorResponse, RewriteMode, TailoredResumeData, GapTargetSection, ResumeStyle, EmploymentGap, EmploymentGapSuggestion } from "../types";
 
 // Backend API URL - uses Vite proxy in development
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
@@ -62,4 +62,33 @@ export async function generateGapSuggestion(
 
   const result = await response.json();
   return result.suggestion;
+}
+
+/**
+ * Generate AI suggestions for addressing an employment gap
+ */
+export async function generateEmploymentGapSuggestions(
+  gap: EmploymentGap,
+  resume: TailoredResumeData,
+  jobDescription: string
+): Promise<EmploymentGapSuggestion[]> {
+  const response = await fetch(`${API_BASE_URL}/employment-gap-suggestion`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      gap,
+      resume,
+      jobDescription,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to generate gap suggestions. Please try again.');
+  }
+
+  const result = await response.json();
+  return result.suggestions as EmploymentGapSuggestion[];
 }
