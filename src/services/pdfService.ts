@@ -178,21 +178,34 @@ const renderExperience = (b: PDFBuilder, experience: ResumeExperience[]) => {
   experience.forEach((exp, idx) => {
     b.ensureSpace(60);
 
+    // Calculate available width for role (leave room for date)
     b.doc.setFont(CONFIG.font, 'bold');
     b.doc.setFontSize(CONFIG.sizes.body);
-    b.doc.text(exp.role, CONFIG.margin, b.cursorY);
     const dateWidth = b.doc.getTextWidth(exp.dateRange);
-    b.doc.text(exp.dateRange, b.pageWidth - CONFIG.margin - dateWidth, b.cursorY);
-    b.cursorY += 13;
+    const roleMaxWidth = b.contentWidth - dateWidth - 20; // 20pt gap between role and date
 
+    // Split role text if too long
+    const roleLines: string[] = b.doc.splitTextToSize(exp.role, roleMaxWidth);
+    b.doc.text(roleLines, CONFIG.margin, b.cursorY);
+    b.doc.text(exp.dateRange, b.pageWidth - CONFIG.margin - dateWidth, b.cursorY);
+
+    // Move cursor based on actual role height
+    const roleHeight = roleLines.length * CONFIG.sizes.body * 1.2;
+    b.cursorY += Math.max(roleHeight, 13);
+
+    // Company and location line
     b.doc.setFont(CONFIG.font, 'normal');
-    b.doc.text(exp.company, CONFIG.margin, b.cursorY);
-    b.doc.setFont(CONFIG.font, 'italic');
     const locWidth = b.doc.getTextWidth(exp.location || '');
+    const companyMaxWidth = b.contentWidth - locWidth - 20;
+    const companyLines: string[] = b.doc.splitTextToSize(exp.company, companyMaxWidth);
+    b.doc.text(companyLines, CONFIG.margin, b.cursorY);
     if (exp.location) {
+      b.doc.setFont(CONFIG.font, 'italic');
       b.doc.text(exp.location, b.pageWidth - CONFIG.margin - locWidth, b.cursorY);
     }
-    b.cursorY += 15;
+
+    const companyHeight = companyLines.length * CONFIG.sizes.body * 1.2;
+    b.cursorY += Math.max(companyHeight, 15);
 
     exp.bullets.forEach(bullet => b.writeBullet(bullet));
 
@@ -208,15 +221,24 @@ const renderEducation = (b: PDFBuilder, education: ResumeEducation[]) => {
     b.doc.setFont(CONFIG.font, 'bold');
     b.doc.setFontSize(CONFIG.sizes.body);
     const degreeText = edu.fieldOfStudy ? `${edu.degree} in ${edu.fieldOfStudy}` : edu.degree;
-    b.doc.text(degreeText, CONFIG.margin, b.cursorY);
     const dateWidth = b.doc.getTextWidth(edu.dateRange);
+    const degreeMaxWidth = b.contentWidth - dateWidth - 20;
+
+    // Split degree text if too long
+    const degreeLines: string[] = b.doc.splitTextToSize(degreeText, degreeMaxWidth);
+    b.doc.text(degreeLines, CONFIG.margin, b.cursorY);
     b.doc.text(edu.dateRange, b.pageWidth - CONFIG.margin - dateWidth, b.cursorY);
-    b.cursorY += 13;
+
+    const degreeHeight = degreeLines.length * CONFIG.sizes.body * 1.2;
+    b.cursorY += Math.max(degreeHeight, 13);
 
     b.doc.setFont(CONFIG.font, 'normal');
-    const eduLocation = edu.location ? ` – ${edu.location}` : '';
-    b.doc.text(`${edu.school}${eduLocation}`, CONFIG.margin, b.cursorY);
-    b.cursorY += 20;
+    const schoolText = edu.location ? `${edu.school} – ${edu.location}` : edu.school;
+    const schoolLines: string[] = b.doc.splitTextToSize(schoolText, b.contentWidth);
+    b.doc.text(schoolLines, CONFIG.margin, b.cursorY);
+
+    const schoolHeight = schoolLines.length * CONFIG.sizes.body * 1.2;
+    b.cursorY += Math.max(schoolHeight, 15) + 5;
   });
   b.cursorY += CONFIG.spacing.section;
 };
@@ -234,12 +256,18 @@ const renderProjects = (b: PDFBuilder, projects: ResumeProject[]) => {
     b.ensureSpace(40);
     b.doc.setFont(CONFIG.font, 'bold');
     b.doc.setFontSize(CONFIG.sizes.body);
-    b.doc.text(proj.name, CONFIG.margin, b.cursorY);
+
+    const dateWidth = proj.dateRange ? b.doc.getTextWidth(proj.dateRange) : 0;
+    const nameMaxWidth = b.contentWidth - dateWidth - 20;
+
+    const nameLines: string[] = b.doc.splitTextToSize(proj.name, nameMaxWidth);
+    b.doc.text(nameLines, CONFIG.margin, b.cursorY);
     if (proj.dateRange) {
-      const dateWidth = b.doc.getTextWidth(proj.dateRange);
       b.doc.text(proj.dateRange, b.pageWidth - CONFIG.margin - dateWidth, b.cursorY);
     }
-    b.cursorY += 13;
+
+    const nameHeight = nameLines.length * CONFIG.sizes.body * 1.2;
+    b.cursorY += Math.max(nameHeight, 13);
 
     if (proj.description) {
       b.writeParagraph(proj.description, CONFIG.sizes.body, 'normal', CONFIG.colors.secondary);
@@ -260,16 +288,28 @@ const renderCertifications = (b: PDFBuilder, certifications: ResumeCertification
     b.doc.setFont(CONFIG.font, 'bold');
     b.doc.setFontSize(CONFIG.sizes.body);
     const certText = cert.issuer ? `${cert.name}, ${cert.issuer}` : cert.name;
-    b.doc.text(certText, CONFIG.margin, b.cursorY);
 
-    if (cert.dateObtained) {
-      const dateText = cert.noExpiration ? `${cert.dateObtained} (No Expiration)` :
-                       cert.expirationDate ? `${cert.dateObtained} - ${cert.expirationDate}` : cert.dateObtained;
-      const dateWidth = b.doc.getTextWidth(dateText);
+    // Calculate date text and available width
+    const dateText = cert.dateObtained ? (
+      cert.noExpiration ? `${cert.dateObtained} (No Expiration)` :
+      cert.expirationDate ? `${cert.dateObtained} - ${cert.expirationDate}` : cert.dateObtained
+    ) : '';
+
+    b.doc.setFont(CONFIG.font, 'normal');
+    const dateWidth = dateText ? b.doc.getTextWidth(dateText) : 0;
+    const certMaxWidth = b.contentWidth - dateWidth - 20;
+
+    b.doc.setFont(CONFIG.font, 'bold');
+    const certLines: string[] = b.doc.splitTextToSize(certText, certMaxWidth);
+    b.doc.text(certLines, CONFIG.margin, b.cursorY);
+
+    if (dateText) {
       b.doc.setFont(CONFIG.font, 'normal');
       b.doc.text(dateText, b.pageWidth - CONFIG.margin - dateWidth, b.cursorY);
     }
-    b.cursorY += 14;
+
+    const certHeight = certLines.length * CONFIG.sizes.body * 1.2;
+    b.cursorY += Math.max(certHeight, 14);
   });
   b.cursorY += CONFIG.spacing.section;
 };
@@ -281,15 +321,24 @@ const renderClinicalHours = (b: PDFBuilder, clinicalHours: ClinicalHoursEntry[])
     b.ensureSpace(40);
     b.doc.setFont(CONFIG.font, 'bold');
     b.doc.setFontSize(CONFIG.sizes.body);
-    b.doc.text(entry.siteName, CONFIG.margin, b.cursorY);
+
     const hoursText = `${entry.hoursCompleted} hours`;
     const hoursWidth = b.doc.getTextWidth(hoursText);
+    const siteMaxWidth = b.contentWidth - hoursWidth - 20;
+
+    const siteLines: string[] = b.doc.splitTextToSize(entry.siteName, siteMaxWidth);
+    b.doc.text(siteLines, CONFIG.margin, b.cursorY);
     b.doc.text(hoursText, b.pageWidth - CONFIG.margin - hoursWidth, b.cursorY);
-    b.cursorY += 13;
+
+    const siteHeight = siteLines.length * CONFIG.sizes.body * 1.2;
+    b.cursorY += Math.max(siteHeight, 13);
 
     b.doc.setFont(CONFIG.font, 'italic');
-    b.doc.text(entry.role, CONFIG.margin, b.cursorY);
-    b.cursorY += 13;
+    const roleLines: string[] = b.doc.splitTextToSize(entry.role, b.contentWidth);
+    b.doc.text(roleLines, CONFIG.margin, b.cursorY);
+
+    const roleHeight = roleLines.length * CONFIG.sizes.body * 1.2;
+    b.cursorY += Math.max(roleHeight, 13);
 
     if (entry.description) {
       b.writeParagraph(entry.description, CONFIG.sizes.body, 'normal', CONFIG.colors.secondary);
@@ -306,16 +355,25 @@ const renderVolunteer = (b: PDFBuilder, volunteer: VolunteerEntry[]) => {
     b.ensureSpace(40);
     b.doc.setFont(CONFIG.font, 'bold');
     b.doc.setFontSize(CONFIG.sizes.body);
-    b.doc.text(vol.organization, CONFIG.margin, b.cursorY);
+
+    const dateWidth = vol.dateRange ? b.doc.getTextWidth(vol.dateRange) : 0;
+    const orgMaxWidth = b.contentWidth - dateWidth - 20;
+
+    const orgLines: string[] = b.doc.splitTextToSize(vol.organization, orgMaxWidth);
+    b.doc.text(orgLines, CONFIG.margin, b.cursorY);
     if (vol.dateRange) {
-      const dateWidth = b.doc.getTextWidth(vol.dateRange);
       b.doc.text(vol.dateRange, b.pageWidth - CONFIG.margin - dateWidth, b.cursorY);
     }
-    b.cursorY += 13;
+
+    const orgHeight = orgLines.length * CONFIG.sizes.body * 1.2;
+    b.cursorY += Math.max(orgHeight, 13);
 
     b.doc.setFont(CONFIG.font, 'italic');
-    b.doc.text(vol.role, CONFIG.margin, b.cursorY);
-    b.cursorY += 13;
+    const roleLines: string[] = b.doc.splitTextToSize(vol.role, b.contentWidth);
+    b.doc.text(roleLines, CONFIG.margin, b.cursorY);
+
+    const roleHeight = roleLines.length * CONFIG.sizes.body * 1.2;
+    b.cursorY += Math.max(roleHeight, 13);
 
     if (vol.description) {
       b.writeParagraph(vol.description, CONFIG.sizes.body, 'normal', CONFIG.colors.secondary);
@@ -352,13 +410,19 @@ const renderAwards = (b: PDFBuilder, awards: AwardEntry[]) => {
     b.doc.setFont(CONFIG.font, 'bold');
     b.doc.setFontSize(CONFIG.sizes.body);
     const awardText = award.issuer ? `${award.title}, ${award.issuer}` : award.title;
-    b.doc.text(awardText, CONFIG.margin, b.cursorY);
+
+    const dateWidth = award.date ? b.doc.getTextWidth(award.date) : 0;
+    const awardMaxWidth = b.contentWidth - dateWidth - 20;
+
+    const awardLines: string[] = b.doc.splitTextToSize(awardText, awardMaxWidth);
+    b.doc.text(awardLines, CONFIG.margin, b.cursorY);
     if (award.date) {
-      const dateWidth = b.doc.getTextWidth(award.date);
       b.doc.setFont(CONFIG.font, 'normal');
       b.doc.text(award.date, b.pageWidth - CONFIG.margin - dateWidth, b.cursorY);
     }
-    b.cursorY += 13;
+
+    const awardHeight = awardLines.length * CONFIG.sizes.body * 1.2;
+    b.cursorY += Math.max(awardHeight, 13);
 
     if (award.description) {
       b.writeParagraph(award.description, CONFIG.sizes.body, 'normal', CONFIG.colors.secondary);

@@ -768,6 +768,108 @@ const ReviewEditView: React.FC<ReviewEditViewProps> = ({
                   </div>
                 </div>
               )}
+
+              {/* Certifications Section */}
+              {editedResume.includeCertifications && editedResume.certifications && editedResume.certifications.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-xs font-bold uppercase border-b border-text-primary pb-0.5 mb-2">
+                    Certifications
+                  </h3>
+                  <div className="space-y-2">
+                    {editedResume.certifications.map((cert, i) => (
+                      <div key={i} className="flex justify-between items-baseline">
+                        <div>
+                          <span className="font-bold">{cert.name}</span>
+                          {cert.issuer && <span className="text-text-muted"> — {cert.issuer}</span>}
+                        </div>
+                        <span className="text-text-muted text-xs italic">
+                          {cert.dateObtained}
+                          {cert.expirationDate && !cert.noExpiration && ` (Exp: ${cert.expirationDate})`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Clinical Hours Section */}
+              {editedResume.includeClinicalHours && editedResume.clinicalHours && editedResume.clinicalHours.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-xs font-bold uppercase border-b border-text-primary pb-0.5 mb-2">
+                    Clinical Hours
+                  </h3>
+                  <div className="space-y-3">
+                    {editedResume.clinicalHours.map((clinical, i) => (
+                      <div key={i}>
+                        <div className="flex justify-between items-baseline mb-0.5">
+                          <h4 className="font-bold text-sm">{clinical.siteName}</h4>
+                          <span className="font-bold text-xs">{clinical.hoursCompleted} hours</span>
+                        </div>
+                        {clinical.role && <p className="italic text-text-secondary text-xs">{clinical.role}</p>}
+                        {clinical.description && (
+                          <p className="text-text-muted text-xs mt-1">{clinical.description}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Publications Section */}
+              {editedResume.includePublications && editedResume.publications && editedResume.publications.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-xs font-bold uppercase border-b border-text-primary pb-0.5 mb-2">
+                    Publications
+                  </h3>
+                  <div className="space-y-2">
+                    {editedResume.publications.map((pub, i) => (
+                      <div key={i}>
+                        <p>
+                          <span className="font-bold">{pub.title}</span>
+                          {pub.publication && <span className="text-text-muted"> — {pub.publication}</span>}
+                          {pub.date && <span className="text-text-muted">, {pub.date}</span>}
+                        </p>
+                        {pub.url && (
+                          <p className="text-accent text-xs">{pub.url}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Languages Section */}
+              {editedResume.includeLanguages && editedResume.languages && editedResume.languages.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-xs font-bold uppercase border-b border-text-primary pb-0.5 mb-2">
+                    Languages
+                  </h3>
+                  <p>{editedResume.languages.join(' • ')}</p>
+                </div>
+              )}
+
+              {/* Awards Section */}
+              {editedResume.includeAwards && editedResume.awards && editedResume.awards.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-xs font-bold uppercase border-b border-text-primary pb-0.5 mb-2">
+                    Awards & Honors
+                  </h3>
+                  <div className="space-y-2">
+                    {editedResume.awards.map((award, i) => (
+                      <div key={i}>
+                        <div className="flex justify-between items-baseline">
+                          <span className="font-bold">{award.title}</span>
+                          {award.date && <span className="text-text-muted text-xs italic">{award.date}</span>}
+                        </div>
+                        {award.issuer && <p className="text-text-muted text-xs">{award.issuer}</p>}
+                        {award.description && (
+                          <p className="text-text-secondary text-xs mt-0.5">{award.description}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
