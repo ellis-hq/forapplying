@@ -174,7 +174,8 @@ export enum AppView {
   INPUT = 'input',
   BUILDER = 'builder',
   REVIEW = 'review',
-  RESULT = 'result'
+  RESULT = 'result',
+  ABOUT = 'about'
 }
 
 // Entry mode for how user is creating their resume

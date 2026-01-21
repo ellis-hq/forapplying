@@ -105,10 +105,10 @@ const WelcomeView: React.FC<WelcomeViewProps> = ({ onSelectMode }) => {
             </div>
             <div className="flex-1">
               <h2 className="text-lg font-bold text-text-primary mb-1 group-hover:text-accent transition-colors">
-                Build or update my resume
+                Build a resume from scratch
               </h2>
               <p className="text-sm text-text-muted">
-                Create from scratch or make changes
+                Create a new resume using our builder
               </p>
             </div>
           </div>

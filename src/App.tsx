@@ -23,6 +23,7 @@ import InputView from './components/InputView';
 import ResumeBuilder from './components/ResumeBuilder';
 import ResultView from './components/ResultView';
 import ReviewEditView from './components/ReviewEditView';
+import AboutView from './components/AboutView';
 import AuthGate from './components/AuthGate';
 
 type ResumeTailorProps = {
@@ -46,6 +47,7 @@ const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }
   const [builtResume, setBuiltResume] = useState<TailoredResumeData | null>(null);
   const [employmentGaps, setEmploymentGaps] = useState<EmploymentGap[]>([]);
   const [gapResolutions, setGapResolutions] = useState<EmploymentGapResolutionState[]>([]);
+  const [previousView, setPreviousView] = useState<AppView>(AppView.WELCOME);
 
   const matchScore = useMemo(() => {
     if (!result) return 0;
@@ -299,6 +301,17 @@ const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }
     setEntryMode(null);
   };
 
+  // Handler for going to About page
+  const handleAbout = () => {
+    setPreviousView(currentView);
+    setCurrentView(AppView.ABOUT);
+  };
+
+  // Handler for going back from About page
+  const handleBackFromAbout = () => {
+    setCurrentView(previousView);
+  };
+
   // Handler for editing resume from review screen
   const handleEditResume = () => {
     if (result) {
@@ -344,7 +357,7 @@ const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }
 
   return (
     <div className="min-h-screen bg-bg flex flex-col items-center py-8 px-4">
-      <Header showReset={currentView !== AppView.WELCOME} onReset={reset} />
+      <Header showReset={currentView !== AppView.WELCOME && currentView !== AppView.ABOUT} onReset={reset} onAbout={handleAbout} />
 
       {currentView === AppView.WELCOME && (
         <WelcomeView onSelectMode={handleSelectMode} />
@@ -404,6 +417,10 @@ const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }
           employmentGaps={employmentGaps}
           gapResolutions={gapResolutions}
         />
+      )}
+
+      {currentView === AppView.ABOUT && (
+        <AboutView onBack={handleBackFromAbout} />
       )}
 
       <Footer />
