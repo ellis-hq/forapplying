@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { TailorResponse, EmploymentGap, EmploymentGapResolutionState, EditableResumeData } from '../types';
 import { generateGapSummary } from '../utils/employmentGapDetector';
+import ConfirmationModal from './ConfirmationModal';
 
 interface ResultViewProps {
   result: TailorResponse;
@@ -43,6 +44,8 @@ const ResultView: React.FC<ResultViewProps> = ({
 }) => {
   const [isDownloadingResume, setIsDownloadingResume] = useState(false);
   const [isDownloadingCoverLetter, setIsDownloadingCoverLetter] = useState(false);
+  const [showResumeConfirm, setShowResumeConfirm] = useState(false);
+  const [showCoverLetterConfirm, setShowCoverLetterConfirm] = useState(false);
 
   // Compute employment gap summary
   const gapSummary = useMemo(() =>
@@ -50,7 +53,16 @@ const ResultView: React.FC<ResultViewProps> = ({
     [employmentGaps, gapResolutions]
   );
 
-  const handleDownloadResume = async () => {
+  const handleResumeClick = () => {
+    setShowResumeConfirm(true);
+  };
+
+  const handleCoverLetterClick = () => {
+    setShowCoverLetterConfirm(true);
+  };
+
+  const handleConfirmResumeDownload = async () => {
+    setShowResumeConfirm(false);
     setIsDownloadingResume(true);
     try {
       await downloadResume();
@@ -59,7 +71,8 @@ const ResultView: React.FC<ResultViewProps> = ({
     }
   };
 
-  const handleDownloadCoverLetter = async () => {
+  const handleConfirmCoverLetterDownload = async () => {
+    setShowCoverLetterConfirm(false);
     setIsDownloadingCoverLetter(true);
     try {
       await downloadCoverLetter();
@@ -170,7 +183,7 @@ const ResultView: React.FC<ResultViewProps> = ({
             </div>
             <div className="flex gap-2 flex-wrap">
               <button
-                onClick={handleDownloadResume}
+                onClick={handleResumeClick}
                 disabled={isDownloadingResume}
                 className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover disabled:bg-accent/70 text-white rounded-lg text-sm font-bold shadow-sm transition-all disabled:cursor-not-allowed"
               >
@@ -182,7 +195,7 @@ const ResultView: React.FC<ResultViewProps> = ({
                 {isDownloadingResume ? 'Downloading...' : 'Download Resume'}
               </button>
               <button
-                onClick={handleDownloadCoverLetter}
+                onClick={handleCoverLetterClick}
                 disabled={isDownloadingCoverLetter}
                 className="flex items-center gap-2 px-4 py-2 border border-border hover:bg-border-light disabled:bg-border-light/50 text-text-secondary rounded-lg text-sm font-bold transition-all disabled:cursor-not-allowed"
               >
@@ -422,6 +435,22 @@ const ResultView: React.FC<ResultViewProps> = ({
           </div>
         </div>
       </section>
+
+      {/* Confirmation Modals */}
+      <ConfirmationModal
+        isOpen={showResumeConfirm}
+        onConfirm={handleConfirmResumeDownload}
+        onCancel={() => setShowResumeConfirm(false)}
+        title="Download Resume"
+        message="Are you sure you want to download? This will cost you 1 download."
+      />
+      <ConfirmationModal
+        isOpen={showCoverLetterConfirm}
+        onConfirm={handleConfirmCoverLetterDownload}
+        onCancel={() => setShowCoverLetterConfirm(false)}
+        title="Download Cover Letter"
+        message="Are you sure you want to download? This will cost you 1 download."
+      />
     </main>
   );
 };
