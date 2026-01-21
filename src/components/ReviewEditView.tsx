@@ -10,7 +10,10 @@ import {
   Pencil,
   AlertCircle,
   Lightbulb,
-  Calendar
+  Calendar,
+  Award,
+  Plus,
+  Trash2
 } from 'lucide-react';
 import {
   TailorResponse,
@@ -25,7 +28,8 @@ import {
   ResumeProject,
   ResumeExperience,
   ResumeEducation,
-  VolunteerEntry
+  VolunteerEntry,
+  ResumeCertification
 } from '../types';
 import { detectEmploymentGaps, generateGapSummary } from '../utils/employmentGapDetector';
 import EmploymentGapAlert from './EmploymentGapAlert';
@@ -443,6 +447,48 @@ const ReviewEditView: React.FC<ReviewEditViewProps> = ({
     setActiveGapForm(null);
   };
 
+  // Certification/License Handlers
+  const [editingCertIndex, setEditingCertIndex] = useState<number | null>(null);
+
+  const addCertification = () => {
+    const newCert: ResumeCertification = {
+      name: '',
+      issuer: '',
+      dateObtained: '',
+      expirationDate: '',
+      noExpiration: false
+    };
+    setEditedResume(prev => ({
+      ...prev,
+      certifications: [...(prev.certifications || []), newCert],
+      includeCertifications: true
+    }));
+    setEditingCertIndex((editedResume.certifications?.length || 0));
+  };
+
+  const updateCertification = (index: number, field: keyof ResumeCertification, value: string | boolean) => {
+    setEditedResume(prev => ({
+      ...prev,
+      certifications: (prev.certifications || []).map((cert, i) =>
+        i === index ? { ...cert, [field]: value } : cert
+      )
+    }));
+  };
+
+  const removeCertification = (index: number) => {
+    setEditedResume(prev => {
+      const newCerts = (prev.certifications || []).filter((_, i) => i !== index);
+      return {
+        ...prev,
+        certifications: newCerts,
+        includeCertifications: newCerts.length > 0
+      };
+    });
+    if (editingCertIndex === index) {
+      setEditingCertIndex(null);
+    }
+  };
+
   const pendingGaps = gapStates.filter(g => g.status === 'pending').length;
   const processedGaps = gapStates.filter(g => g.status === 'accepted' || g.status === 'skipped').length;
 
@@ -604,6 +650,164 @@ const ReviewEditView: React.FC<ReviewEditViewProps> = ({
             onCancel={handleGapFormCancel}
           />
         )}
+
+        {/* Certifications & Licenses Section */}
+        <div className="bg-surface p-6 rounded-2xl shadow-sm border border-border">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-bold text-text-primary flex items-center gap-2">
+              <Award className="w-4 h-4 text-accent" />
+              Certifications & Licenses
+            </h2>
+            <button
+              onClick={addCertification}
+              className="flex items-center gap-1 px-2 py-1 text-xs text-accent hover:bg-accent-light rounded transition-colors"
+            >
+              <Plus className="w-3 h-3" />
+              Add
+            </button>
+          </div>
+
+          <p className="text-xs text-text-muted mb-4">
+            Review and edit your certifications and licenses. Expiration dates are critical for many employers.
+          </p>
+
+          {(!editedResume.certifications || editedResume.certifications.length === 0) ? (
+            <p className="text-xs text-text-muted italic text-center py-4">
+              No certifications found. Click "Add" to add one.
+            </p>
+          ) : (
+            <div className="space-y-3 max-h-[40vh] overflow-y-auto custom-scrollbar pr-2">
+              {editedResume.certifications.map((cert, index) => (
+                <div
+                  key={index}
+                  className={`rounded-lg border transition-all ${
+                    editingCertIndex === index
+                      ? 'bg-surface border-accent-muted shadow-sm'
+                      : 'bg-border-light border-border hover:border-text-muted'
+                  }`}
+                >
+                  <div className="p-4">
+                    {editingCertIndex === index ? (
+                      /* Editing Mode */
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs text-text-muted mb-1">Certification/License Name *</label>
+                            <input
+                              type="text"
+                              value={cert.name}
+                              onChange={(e) => updateCertification(index, 'name', e.target.value)}
+                              placeholder="e.g., RN License, AWS Solutions Architect"
+                              className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-accent focus:border-transparent"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-text-muted mb-1">Issuing Organization</label>
+                            <input
+                              type="text"
+                              value={cert.issuer}
+                              onChange={(e) => updateCertification(index, 'issuer', e.target.value)}
+                              placeholder="e.g., State Board of Nursing"
+                              className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-accent focus:border-transparent"
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs text-text-muted mb-1">Date Obtained</label>
+                            <input
+                              type="text"
+                              value={cert.dateObtained}
+                              onChange={(e) => updateCertification(index, 'dateObtained', e.target.value)}
+                              placeholder="e.g., 03/2020 or March 2020"
+                              className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-accent focus:border-transparent"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-text-muted mb-1">
+                              Expiration Date
+                              <span className="ml-1 text-warning">(Important!)</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={cert.expirationDate || ''}
+                              onChange={(e) => updateCertification(index, 'expirationDate', e.target.value)}
+                              placeholder="e.g., 03/2025 or March 2025"
+                              disabled={cert.noExpiration}
+                              className={`w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-accent focus:border-transparent ${
+                                cert.noExpiration ? 'bg-border-light text-text-muted' : ''
+                              }`}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <label className="flex items-center gap-2 text-xs text-text-secondary cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={cert.noExpiration || false}
+                              onChange={(e) => {
+                                updateCertification(index, 'noExpiration', e.target.checked);
+                                if (e.target.checked) {
+                                  updateCertification(index, 'expirationDate', '');
+                                }
+                              }}
+                              className="rounded border-border text-accent focus:ring-accent"
+                            />
+                            No Expiration / Lifetime Certification
+                          </label>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => removeCertification(index)}
+                              className="px-2 py-1 text-xs text-red-500 hover:bg-red-50 rounded transition-colors"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => setEditingCertIndex(null)}
+                              className="px-3 py-1 text-xs bg-accent text-white rounded hover:bg-accent-hover transition-colors"
+                            >
+                              Done
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Display Mode */
+                      <div
+                        className="cursor-pointer"
+                        onClick={() => setEditingCertIndex(index)}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-text-primary">
+                              {cert.name || <span className="italic text-text-muted">Unnamed Certification</span>}
+                            </p>
+                            {cert.issuer && (
+                              <p className="text-xs text-text-muted">{cert.issuer}</p>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            {cert.dateObtained && (
+                              <p className="text-xs text-text-secondary">{cert.dateObtained}</p>
+                            )}
+                            {cert.noExpiration ? (
+                              <p className="text-xs text-success">No Expiration</p>
+                            ) : cert.expirationDate ? (
+                              <p className="text-xs text-warning font-medium">Exp: {cert.expirationDate}</p>
+                            ) : (
+                              <p className="text-xs text-red-500 italic">No expiration date set</p>
+                            )}
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-text-muted mt-2">Click to edit</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Edit Resume Button */}
         {onEditResume && (

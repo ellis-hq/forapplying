@@ -83,7 +83,7 @@ function sanitizeString(str) {
 }
 
 function validateTailorRequest(req, res, next) {
-  const { resumeText, jobDescription, companyName, mode, resumeStyle } = req.body;
+  const { resumeText, jobDescription, companyName, mode, resumeStyle, objective } = req.body;
 
   // Check required fields
   if (!resumeText || !jobDescription || !companyName) {
@@ -134,12 +134,20 @@ function validateTailorRequest(req, res, next) {
     });
   }
 
+  // Objective is optional, but if provided must be string
+  if (objective && typeof objective !== 'string') {
+    return res.status(400).json({
+      error: 'Invalid objective. Must be a string.',
+    });
+  }
+
   // Sanitize inputs
   req.body.resumeText = sanitizeString(resumeText);
   req.body.jobDescription = sanitizeString(jobDescription);
   req.body.companyName = sanitizeString(companyName);
   req.body.mode = mode || 'conservative';
   req.body.resumeStyle = resumeStyle || 'classic';
+  req.body.objective = objective ? sanitizeString(objective) : null;
 
   next();
 }
@@ -212,7 +220,7 @@ const RESUME_STYLES = [
   }
 ];
 
-function buildTailorPrompts(resumeText, jobDescription, companyName, mode, resumeStyle) {
+function buildTailorPrompts(resumeText, jobDescription, companyName, mode, resumeStyle, objective = null) {
   const styleInfo = RESUME_STYLES.find(s => s.id === resumeStyle) || RESUME_STYLES[0];
 
   const systemPrompt = `You are a professional resume writer and ATS (Applicant Tracking System) optimization expert. Your job is to take the candidate's existing experience and reframe it using the exact vocabulary, action verbs, and terminology from the job description. Think of it as translation - same meaning, different words that resonate with this specific employer. Be aggressive with synonym replacement and phrasing updates, but never invent new responsibilities or skills.
@@ -221,9 +229,29 @@ You must respond ONLY with valid JSON - no markdown, no code blocks, no explanat
 
 CRITICAL DATE PRESERVATION:
 - Extract and preserve ALL date information with extreme precision
+- PRESERVE THE EXACT DATE FORMAT from the original resume - DO NOT convert formats
+  Examples of format preservation:
+  - "02/2010" stays as "02/2010" (NOT "Feb 2010" or "February 2010")
+  - "March 2020" stays as "March 2020" (NOT "03/2020" or "Mar 2020")
+  - "2019-05" stays as "2019-05" (NOT "May 2019")
+  - "Q1 2022" stays as "Q1 2022" (NOT "January 2022")
 - If an entry says "May 2024 – December 2025", return the FULL range, not just "May 2024"
 - If months are present in the source, they MUST appear in the output
 - Check for "Present" or current employment indicators
+
+CERTIFICATION & LICENSE DATE EXTRACTION - CRITICAL:
+- For certifications and licenses, extract ALL dates with extreme care:
+  - dateObtained: When the certification was earned/issued
+  - expirationDate: When the certification expires (CRITICAL for healthcare, legal, financial licenses)
+  - noExpiration: Set to true ONLY if explicitly stated "No Expiration", "Does Not Expire", "Lifetime", or similar
+- Common certification date patterns to look for:
+  - "Issued: 03/2020, Expires: 03/2025"
+  - "Valid through 12/2026"
+  - "Obtained January 2019 (Expires January 2024)"
+  - "RN License #12345, Exp: 08/2025"
+- PRESERVE the exact format of certification dates from the original
+- If only one date is shown for a certification, it is typically the dateObtained
+- Look for expiration indicators: "Exp:", "Expires:", "Valid through", "Valid until", "Renewal date"
 
 ═══════════════════════════════════════════════════════════════
 SECTION PRESERVATION RULES - ABSOLUTELY CRITICAL
@@ -235,6 +263,19 @@ You MUST preserve EVERY section from the original resume, even if it doesn't mat
 - If you're unsure what category something belongs to, include it in an appropriate section or create an 'Additional Information' section
 - Before finalizing your response, CROSS-CHECK that every section header from the original appears in your output
 - The "additionalSections" field in your JSON output should capture any non-standard sections from the original resume
+
+═══════════════════════════════════════════════════════════════
+FIELD-SPECIFIC SECTIONS - NEVER DROP
+═══════════════════════════════════════════════════════════════
+
+• Healthcare: Clinical Hours, Rotations, Licenses, CME Credits, Certifications (RN, CNA, etc.)
+• Legal: Bar Admissions, Case Experience, Pro Bono, Court Appearances
+• Academic: Publications, Research, Teaching Experience, Grants, Conference Presentations
+• Technical: Projects, GitHub/Portfolio, Patents, Open Source Contributions
+• Creative: Portfolio, Exhibitions, Published Work, Shows/Performances
+• Finance: Series Licenses (7, 63, 65), CPA, CFA designations
+
+If original has ANY section you don't recognize, include it verbatim in the appropriate output field.
 
 ═══════════════════════════════════════════════════════════════
 GRAMMAR AND FORMATTING RULES - MANDATORY
@@ -250,6 +291,20 @@ GRAMMAR AND FORMATTING RULES - MANDATORY
 - Ensure PROPER CAPITALIZATION of company names, job titles, technologies, and certifications
 - DOUBLE-CHECK all output for typos and grammatical errors before returning
 - Each bullet should START with a strong action verb
+
+═══════════════════════════════════════════════════════════════
+FINAL QUALITY CHECK - MANDATORY BEFORE RESPONDING
+═══════════════════════════════════════════════════════════════
+
+Before returning your response, verify:
+• Every bullet starts with a STRONG ACTION VERB (Developed, Led, Implemented, not "Was responsible for")
+• PARALLEL STRUCTURE within each job's bullets (all start same way grammatically)
+• CONSISTENT PUNCTUATION (all periods or no periods - pick one and stick with it)
+• NO RUN-ON SENTENCES or sentence fragments
+• COMPLETE SENTENCES in summary/objective section
+• PROPER BUSINESS LETTER FORMAT for cover letter (greeting, body paragraphs, closing)
+• NO TYPOS, grammar errors, or cut-off text
+• ALL DATES preserved exactly as in original (including months if present)
 
 ABSOLUTE GUARDRAILS - NEVER VIOLATE:
 1. NEVER fabricate responsibilities, achievements, or experiences not implied by the original
@@ -331,7 +386,26 @@ BOTH MODES MUST:
 - Apply intelligent synonym replacement
 - Match JD tone and vocabulary
 - Never violate the guardrails (no fabrication, no fake metrics, no invented tools)
+${objective ? `
+═══════════════════════════════════════════════════════════════
+OBJECTIVE-DRIVEN OPTIMIZATION
+═══════════════════════════════════════════════════════════════
 
+The candidate's stated career objective: "${objective}"
+
+RESUME OPTIMIZATION:
+- Prioritize experiences that align with this objective
+- Emphasize transferable skills relevant to their stated goal
+- Use language that bridges past experience to future direction
+- Frame accomplishments in terms of the career path they're pursuing
+
+COVER LETTER CUSTOMIZATION:
+- Weave the objective narrative into the opening paragraph
+- Explicitly address any career transition positively
+- Connect past experiences to future goals with specific examples
+- Frame the transition confidently - focus on what they BRING, not what they lack
+- Show genuine enthusiasm for the new direction
+` : ''}
 ═══════════════════════════════════════════════════════════════
 RESUME STYLE: ${styleInfo.name}
 ═══════════════════════════════════════════════════════════════
@@ -392,13 +466,14 @@ Respond with ONLY a valid JSON object matching this exact structure (no markdown
     "includeProjects": "boolean - true if projects section exists",
     "certifications": [
       {
-        "name": "string",
-        "issuer": "string",
-        "dateObtained": "string",
-        "expirationDate": "string or empty"
+        "name": "string - certification or license name (e.g., 'RN License', 'CPA', 'AWS Solutions Architect')",
+        "issuer": "string - issuing organization (e.g., 'State Board of Nursing', 'Amazon Web Services')",
+        "dateObtained": "string - PRESERVE EXACT FORMAT from original (e.g., '03/2020' or 'March 2020')",
+        "expirationDate": "string or empty - PRESERVE EXACT FORMAT, extract from 'Exp:', 'Valid through', etc.",
+        "noExpiration": "boolean - true ONLY if explicitly stated as lifetime/no expiration"
       }
     ],
-    "includeCertifications": "boolean - true if certifications exist",
+    "includeCertifications": "boolean - true if certifications or licenses exist",
     "clinicalHours": [
       {
         "siteName": "string",
@@ -494,6 +569,100 @@ Respond with ONLY the suggested text, no quotes, no explanation.`;
   return { systemPrompt, userPrompt };
 }
 
+function inferIndustry(resume) {
+  const text = [
+    ...(resume.skills?.tools || []),
+    ...(resume.skills?.core || []),
+    ...(resume.experience || []).map(e => `${e.role} ${e.company}`),
+    resume.summary || ''
+  ].join(' ').toLowerCase();
+
+  const industries = {
+    'Technology/Software': ['software', 'developer', 'engineer', 'programming', 'javascript', 'python', 'react', 'aws', 'cloud', 'devops', 'data'],
+    'Healthcare': ['nurse', 'medical', 'clinical', 'patient', 'healthcare', 'hospital', 'physician', 'therapy'],
+    'Finance': ['finance', 'accounting', 'banking', 'investment', 'financial', 'analyst', 'cpa', 'audit'],
+    'Marketing': ['marketing', 'digital', 'seo', 'content', 'brand', 'advertising', 'social media', 'campaign'],
+    'Sales': ['sales', 'account', 'business development', 'client', 'revenue', 'quota'],
+    'Education': ['teacher', 'education', 'curriculum', 'student', 'teaching', 'school', 'professor'],
+    'Legal': ['attorney', 'legal', 'law', 'paralegal', 'litigation', 'contract'],
+    'Design': ['designer', 'ux', 'ui', 'graphic', 'creative', 'figma', 'adobe', 'visual'],
+    'HR/People': ['human resources', 'recruiting', 'talent', 'hr', 'hiring', 'employee']
+  };
+
+  for (const [industry, keywords] of Object.entries(industries)) {
+    const matches = keywords.filter(kw => text.includes(kw));
+    if (matches.length >= 2) {
+      return industry;
+    }
+  }
+
+  return 'General Professional';
+}
+
+function buildEmploymentGapSuggestionPrompts(gap, resume, jobDescription) {
+  const resumeContext = `
+Industry/Field: ${inferIndustry(resume)}
+Skills: ${[...(resume.skills?.tools || []), ...(resume.skills?.core || [])].join(', ')}
+Recent Experience:
+${(resume.experience || []).slice(0, 3).map(exp => `- ${exp.role} at ${exp.company}`).join('\n')}
+Education:
+${(resume.education || []).map(edu => `- ${edu.degree} from ${edu.school}`).join('\n')}
+`;
+
+  const gapContext = `
+Gap Period: ${gap.durationMonths} months
+Previous Role: ${gap.previousJob.role} at ${gap.previousJob.company} (ended ${gap.previousJob.endDate})
+Next Role: ${gap.nextJob.role} at ${gap.nextJob.company} (started ${gap.nextJob.startDate})
+`;
+
+  const systemPrompt = `You are a career advisor helping a job seeker address an employment gap on their resume. Your goal is to suggest realistic, truthful activities that could explain and add value during this gap period.
+
+CRITICAL RULES:
+1. Suggestions must be REALISTIC and BELIEVABLE based on the person's background
+2. Never suggest anything that would be obvious fabrication
+3. Consider the industry, skill level, and context
+4. Suggestions should be things that could be easily verified or discussed in an interview
+5. Focus on activities that build relevant skills or demonstrate initiative
+
+You must respond with ONLY valid JSON - no markdown, no code blocks, no explanation.`;
+
+  const userPrompt = `Based on this candidate's background, suggest 3-4 realistic activities they could have done during their employment gap.
+
+CANDIDATE CONTEXT:
+${resumeContext}
+
+GAP DETAILS:
+${gapContext}
+
+${jobDescription ? `TARGET JOB (they're applying to):
+${jobDescription.substring(0, 800)}...` : ''}
+
+Consider suggesting activities from these categories:
+- Personal project (open source, app, portfolio piece)
+- Freelance/consulting work
+- Additional education (courses, certifications, bootcamp)
+- Volunteer work (relevant to their field or showing leadership)
+
+For each suggestion:
+- Make it SPECIFIC to their field/skills
+- Keep it realistic for the gap duration
+- Include details that make it believable
+- Ensure it adds value to their resume
+
+Respond with ONLY this JSON structure:
+{
+  "suggestions": [
+    {
+      "type": "project" | "freelance" | "education" | "volunteer",
+      "title": "Brief title for the activity",
+      "description": "2-3 sentences describing what they did and what they gained/achieved"
+    }
+  ]
+}`;
+
+  return { systemPrompt, userPrompt };
+}
+
 // =============================================================================
 // API ENDPOINTS
 // =============================================================================
@@ -506,14 +675,15 @@ app.get('/api/health', (req, res) => {
 // Main resume tailoring endpoint
 app.post('/api/tailor', validateTailorRequest, async (req, res) => {
   try {
-    const { resumeText, jobDescription, companyName, mode, resumeStyle } = req.body;
+    const { resumeText, jobDescription, companyName, mode, resumeStyle, objective } = req.body;
 
     const { systemPrompt, userPrompt } = buildTailorPrompts(
       resumeText,
       jobDescription,
       companyName,
       mode,
-      resumeStyle
+      resumeStyle,
+      objective
     );
 
     const response = await anthropic.messages.create({
@@ -594,6 +764,64 @@ app.post('/api/gap-suggestion', validateGapSuggestionRequest, async (req, res) =
   }
 });
 
+// Employment gap suggestion endpoint
+app.post('/api/employment-gap-suggestion', async (req, res) => {
+  try {
+    const { gap, resume, jobDescription = '' } = req.body;
+
+    if (!gap || !resume) {
+      return res.status(400).json({ error: 'Missing required fields: gap and resume are required.' });
+    }
+
+    if (!gap.previousJob || !gap.nextJob || !gap.durationMonths) {
+      return res.status(400).json({ error: 'Invalid gap object. Must include previousJob, nextJob, and durationMonths.' });
+    }
+
+    const { systemPrompt, userPrompt } = buildEmploymentGapSuggestionPrompts(
+      gap,
+      resume,
+      sanitizeString(jobDescription)
+    );
+
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1024,
+      messages: [{ role: 'user', content: userPrompt }],
+      system: systemPrompt,
+    });
+
+    const textContent = response.content.find(block => block.type === 'text');
+    if (!textContent || textContent.type !== 'text') {
+      return res.status(500).json({ error: 'Failed to generate suggestions. Please try again.' });
+    }
+
+    // Parse JSON response
+    let jsonText = textContent.text.trim();
+
+    // Remove markdown code blocks if present
+    if (jsonText.startsWith('```json')) {
+      jsonText = jsonText.slice(7);
+    } else if (jsonText.startsWith('```')) {
+      jsonText = jsonText.slice(3);
+    }
+    if (jsonText.endsWith('```')) {
+      jsonText = jsonText.slice(0, -3);
+    }
+    jsonText = jsonText.trim();
+
+    try {
+      const result = JSON.parse(jsonText);
+      res.json(result);
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError.message);
+      res.status(500).json({ error: 'Failed to process the response. Please try again.' });
+    }
+  } catch (error) {
+    console.error('Employment gap suggestion API error:', error.message);
+    res.status(500).json({ error: 'Failed to generate suggestions. Please try again.' });
+  }
+});
+
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({ error: 'Endpoint not found' });
@@ -614,4 +842,5 @@ app.listen(PORT, () => {
   console.log('  GET  /api/health');
   console.log('  POST /api/tailor');
   console.log('  POST /api/gap-suggestion');
+  console.log('  POST /api/employment-gap-suggestion');
 });

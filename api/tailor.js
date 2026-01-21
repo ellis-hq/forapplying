@@ -16,7 +16,7 @@ function sanitizeString(str) {
 }
 
 function validateRequest(body) {
-  const { resumeText, jobDescription, companyName, mode, resumeStyle } = body;
+  const { resumeText, jobDescription, companyName, mode, resumeStyle, objective } = body;
 
   if (!resumeText || !jobDescription || !companyName) {
     return { error: 'Missing required fields: resumeText, jobDescription, and companyName are required.' };
@@ -46,6 +46,11 @@ function validateRequest(body) {
   const validStyles = ['classic', 'hybrid', 'technical'];
   if (resumeStyle && !validStyles.includes(resumeStyle)) {
     return { error: 'Invalid resumeStyle. Must be "classic", "hybrid", or "technical".' };
+  }
+
+  // Objective is optional, but if provided must be string
+  if (objective && typeof objective !== 'string') {
+    return { error: 'Invalid objective. Must be a string.' };
   }
 
   return null;
@@ -78,7 +83,7 @@ const RESUME_STYLES = [
   }
 ];
 
-function buildTailorPrompts(resumeText, jobDescription, companyName, mode, resumeStyle) {
+function buildTailorPrompts(resumeText, jobDescription, companyName, mode, resumeStyle, objective = null) {
   const styleInfo = RESUME_STYLES.find(s => s.id === resumeStyle) || RESUME_STYLES[0];
 
   const systemPrompt = `You are a professional resume writer and ATS (Applicant Tracking System) optimization expert. Your job is to take the candidate's existing experience and reframe it using the exact vocabulary, action verbs, and terminology from the job description. Think of it as translation - same meaning, different words that resonate with this specific employer. Be aggressive with synonym replacement and phrasing updates, but never invent new responsibilities or skills.
@@ -87,9 +92,29 @@ You must respond ONLY with valid JSON - no markdown, no code blocks, no explanat
 
 CRITICAL DATE PRESERVATION:
 - Extract and preserve ALL date information with extreme precision
+- PRESERVE THE EXACT DATE FORMAT from the original resume - DO NOT convert formats
+  Examples of format preservation:
+  - "02/2010" stays as "02/2010" (NOT "Feb 2010" or "February 2010")
+  - "March 2020" stays as "March 2020" (NOT "03/2020" or "Mar 2020")
+  - "2019-05" stays as "2019-05" (NOT "May 2019")
+  - "Q1 2022" stays as "Q1 2022" (NOT "January 2022")
 - If an entry says "May 2024 – December 2025", return the FULL range, not just "May 2024"
 - If months are present in the source, they MUST appear in the output
 - Check for "Present" or current employment indicators
+
+CERTIFICATION & LICENSE DATE EXTRACTION - CRITICAL:
+- For certifications and licenses, extract ALL dates with extreme care:
+  - dateObtained: When the certification was earned/issued
+  - expirationDate: When the certification expires (CRITICAL for healthcare, legal, financial licenses)
+  - noExpiration: Set to true ONLY if explicitly stated "No Expiration", "Does Not Expire", "Lifetime", or similar
+- Common certification date patterns to look for:
+  - "Issued: 03/2020, Expires: 03/2025"
+  - "Valid through 12/2026"
+  - "Obtained January 2019 (Expires January 2024)"
+  - "RN License #12345, Exp: 08/2025"
+- PRESERVE the exact format of certification dates from the original
+- If only one date is shown for a certification, it is typically the dateObtained
+- Look for expiration indicators: "Exp:", "Expires:", "Valid through", "Valid until", "Renewal date"
 
 ═══════════════════════════════════════════════════════════════
 SECTION PRESERVATION RULES - ABSOLUTELY CRITICAL
@@ -101,6 +126,19 @@ You MUST preserve EVERY section from the original resume, even if it doesn't mat
 - If you're unsure what category something belongs to, include it in an appropriate section or create an 'Additional Information' section
 - Before finalizing your response, CROSS-CHECK that every section header from the original appears in your output
 - The "additionalSections" field in your JSON output should capture any non-standard sections from the original resume
+
+═══════════════════════════════════════════════════════════════
+FIELD-SPECIFIC SECTIONS - NEVER DROP
+═══════════════════════════════════════════════════════════════
+
+• Healthcare: Clinical Hours, Rotations, Licenses, CME Credits, Certifications (RN, CNA, etc.)
+• Legal: Bar Admissions, Case Experience, Pro Bono, Court Appearances
+• Academic: Publications, Research, Teaching Experience, Grants, Conference Presentations
+• Technical: Projects, GitHub/Portfolio, Patents, Open Source Contributions
+• Creative: Portfolio, Exhibitions, Published Work, Shows/Performances
+• Finance: Series Licenses (7, 63, 65), CPA, CFA designations
+
+If original has ANY section you don't recognize, include it verbatim in the appropriate output field.
 
 ═══════════════════════════════════════════════════════════════
 GRAMMAR AND FORMATTING RULES - MANDATORY
@@ -116,6 +154,20 @@ GRAMMAR AND FORMATTING RULES - MANDATORY
 - Ensure PROPER CAPITALIZATION of company names, job titles, technologies, and certifications
 - DOUBLE-CHECK all output for typos and grammatical errors before returning
 - Each bullet should START with a strong action verb
+
+═══════════════════════════════════════════════════════════════
+FINAL QUALITY CHECK - MANDATORY BEFORE RESPONDING
+═══════════════════════════════════════════════════════════════
+
+Before returning your response, verify:
+• Every bullet starts with a STRONG ACTION VERB (Developed, Led, Implemented, not "Was responsible for")
+• PARALLEL STRUCTURE within each job's bullets (all start same way grammatically)
+• CONSISTENT PUNCTUATION (all periods or no periods - pick one and stick with it)
+• NO RUN-ON SENTENCES or sentence fragments
+• COMPLETE SENTENCES in summary/objective section
+• PROPER BUSINESS LETTER FORMAT for cover letter (greeting, body paragraphs, closing)
+• NO TYPOS, grammar errors, or cut-off text
+• ALL DATES preserved exactly as in original (including months if present)
 
 ABSOLUTE GUARDRAILS - NEVER VIOLATE:
 1. NEVER fabricate responsibilities, achievements, or experiences not implied by the original
@@ -197,7 +249,26 @@ BOTH MODES MUST:
 - Apply intelligent synonym replacement
 - Match JD tone and vocabulary
 - Never violate the guardrails (no fabrication, no fake metrics, no invented tools)
+${objective ? `
+═══════════════════════════════════════════════════════════════
+OBJECTIVE-DRIVEN OPTIMIZATION
+═══════════════════════════════════════════════════════════════
 
+The candidate's stated career objective: "${objective}"
+
+RESUME OPTIMIZATION:
+- Prioritize experiences that align with this objective
+- Emphasize transferable skills relevant to their stated goal
+- Use language that bridges past experience to future direction
+- Frame accomplishments in terms of the career path they're pursuing
+
+COVER LETTER CUSTOMIZATION:
+- Weave the objective narrative into the opening paragraph
+- Explicitly address any career transition positively
+- Connect past experiences to future goals with specific examples
+- Frame the transition confidently - focus on what they BRING, not what they lack
+- Show genuine enthusiasm for the new direction
+` : ''}
 ═══════════════════════════════════════════════════════════════
 RESUME STYLE: ${styleInfo.name}
 ═══════════════════════════════════════════════════════════════
@@ -258,13 +329,14 @@ Respond with ONLY a valid JSON object matching this exact structure (no markdown
     "includeProjects": "boolean - true if projects section exists",
     "certifications": [
       {
-        "name": "string",
-        "issuer": "string",
-        "dateObtained": "string",
-        "expirationDate": "string or empty"
+        "name": "string - certification or license name (e.g., 'RN License', 'CPA', 'AWS Solutions Architect')",
+        "issuer": "string - issuing organization (e.g., 'State Board of Nursing', 'Amazon Web Services')",
+        "dateObtained": "string - PRESERVE EXACT FORMAT from original (e.g., '03/2020' or 'March 2020')",
+        "expirationDate": "string or empty - PRESERVE EXACT FORMAT, extract from 'Exp:', 'Valid through', etc.",
+        "noExpiration": "boolean - true ONLY if explicitly stated as lifetime/no expiration"
       }
     ],
-    "includeCertifications": "boolean - true if certifications exist",
+    "includeCertifications": "boolean - true if certifications or licenses exist",
     "clinicalHours": [
       {
         "siteName": "string",
@@ -358,18 +430,20 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { resumeText, jobDescription, companyName, mode = 'conservative', resumeStyle = 'classic' } = req.body;
+    const { resumeText, jobDescription, companyName, mode = 'conservative', resumeStyle = 'classic', objective } = req.body;
 
     const sanitizedResume = sanitizeString(resumeText);
     const sanitizedJobDesc = sanitizeString(jobDescription);
     const sanitizedCompany = sanitizeString(companyName);
+    const sanitizedObjective = objective ? sanitizeString(objective) : null;
 
     const { systemPrompt, userPrompt } = buildTailorPrompts(
       sanitizedResume,
       sanitizedJobDesc,
       sanitizedCompany,
       mode,
-      resumeStyle
+      resumeStyle,
+      sanitizedObjective
     );
 
     const response = await anthropic.messages.create({

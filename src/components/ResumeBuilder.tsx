@@ -318,7 +318,8 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({
     };
     setResume(prev => ({
       ...prev,
-      projects: [...(prev.projects || []), newProject]
+      projects: [...(prev.projects || []), newProject],
+      includeProjects: true
     }));
   };
 
@@ -351,7 +352,8 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({
     };
     setResume(prev => ({
       ...prev,
-      certifications: [...(prev.certifications || []), newCert]
+      certifications: [...(prev.certifications || []), newCert],
+      includeCertifications: true
     }));
   };
 
@@ -387,7 +389,8 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({
     };
     setResume(prev => ({
       ...prev,
-      clinicalHours: [...(prev.clinicalHours || []), newEntry]
+      clinicalHours: [...(prev.clinicalHours || []), newEntry],
+      includeClinicalHours: true
     }));
   };
 
@@ -419,7 +422,8 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({
     };
     setResume(prev => ({
       ...prev,
-      volunteer: [...(prev.volunteer || []), newEntry]
+      volunteer: [...(prev.volunteer || []), newEntry],
+      includeVolunteer: true
     }));
   };
 
@@ -451,7 +455,8 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({
     };
     setResume(prev => ({
       ...prev,
-      publications: [...(prev.publications || []), newEntry]
+      publications: [...(prev.publications || []), newEntry],
+      includePublications: true
     }));
   };
 
@@ -483,7 +488,8 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({
     };
     setResume(prev => ({
       ...prev,
-      awards: [...(prev.awards || []), newEntry]
+      awards: [...(prev.awards || []), newEntry],
+      includeAwards: true
     }));
   };
 
@@ -510,7 +516,8 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({
     if (!value.trim()) return;
     setResume(prev => ({
       ...prev,
-      languages: [...(prev.languages || []), value.trim()]
+      languages: [...(prev.languages || []), value.trim()],
+      includeLanguages: true
     }));
     setLanguageInput('');
   };
