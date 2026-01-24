@@ -54,6 +54,32 @@ nvm alias default 22
 - Build takes 10+ minutes
 - Requests take 3+ seconds each
 
+## Known Issues
+
+### Local Dev Server Not Starting
+
+**Status:** Unresolved - App runs successfully on Vercel but fails to start locally.
+
+**Symptoms:**
+- Running `npm run dev` shows concurrently starting but produces no output
+- Server process starts but doesn't listen on port 3001
+- No error messages displayed
+
+**Investigation findings:**
+- Shell environment has `ANTHROPIC_API_KEY=""` (empty string) set, which blocks dotenv from loading the value from `.env`
+- `dotenv.config({ override: true })` successfully loads the API key
+- Server passes API key validation but still doesn't bind to port
+- No syntax errors or import issues detected
+
+**Workaround:**
+- App is deployed and fully functional on Vercel at https://forapplying.vercel.app/
+- Vercel uses environment variables configured in dashboard, bypassing the local dotenv issue
+
+**Next steps for debugging:**
+- Investigate why server doesn't bind to port even after successful initialization
+- Check for silent failures in Express middleware or route setup
+- Consider removing `ANTHROPIC_API_KEY=""` from shell environment (likely in `.zshrc`)
+
 ## Development Notes
 
 - Main branch: `main`

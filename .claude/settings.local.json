@@ -34,7 +34,19 @@
       "Bash(kill:*)",
       "Bash(node server/index.js:*)",
       "Bash(xxd:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(source ~/.nvm/nvm.sh)",
+      "Bash(nvm use:*)",
+      "Bash(timeout 5 bash:*)",
+      "Bash(bash -c 'source ~/.nvm/nvm.sh && node --version')",
+      "Bash(bash -c 'source ~/.nvm/nvm.sh && nvm use 22 && npm run dev')",
+      "Bash(bash -c 'source ~/.nvm/nvm.sh && nvm use 22 >/dev/null 2>&1 && node -e \"\"import\\(\\\\\"\"dotenv\\\\\"\"\\).then\\(d => { d.config\\(\\); console.log\\(\\\\\"\"ANTHROPIC_API_KEY loaded:\\\\\"\", !!process.env.ANTHROPIC_API_KEY\\); console.log\\(\\\\\"\"PORT:\\\\\"\", process.env.PORT\\); }\\)\"\"')",
+      "Bash(bash -c 'source ~/.nvm/nvm.sh && nvm use 22 >/dev/null 2>&1 && node /tmp/dotenv-test.js')",
+      "Bash(bash -c 'source ~/.nvm/nvm.sh && nvm use 22 >/dev/null 2>&1 && node debug-dotenv.js')",
+      "Bash(bash:*)",
+      "Bash(env:*)",
+      "Bash(chmod:*)",
+      "Bash(/tmp/test-server.sh)"
     ]
   }
 }
