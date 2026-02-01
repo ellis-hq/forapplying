@@ -3,7 +3,10 @@ import cors from 'cors';
 import Anthropic from '@anthropic-ai/sdk';
 import dotenv from 'dotenv';
 
+
+
 // Load environment variables from .env file
+
 dotenv.config();
 
 const app = express();
@@ -14,6 +17,7 @@ if (!process.env.ANTHROPIC_API_KEY) {
   console.error('ERROR: ANTHROPIC_API_KEY environment variable is required');
   process.exit(1);
 }
+
 
 // Initialize Anthropic client (server-side only - key never exposed to frontend)
 const anthropic = new Anthropic({
@@ -836,7 +840,8 @@ app.use((err, req, res, next) => {
 // =============================================================================
 // START SERVER
 // =============================================================================
-app.listen(PORT, () => {
+
+const server = app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
   console.log('Available endpoints:');
   console.log('  GET  /api/health');
@@ -844,3 +849,20 @@ app.listen(PORT, () => {
   console.log('  POST /api/gap-suggestion');
   console.log('  POST /api/employment-gap-suggestion');
 });
+
+// Graceful shutdown
+function shutdown() {
+  console.log('Received kill signal, shutting down gracefully');
+  server.close(() => {
+    console.log('Closed out remaining connections');
+    process.exit(0);
+  });
+
+  setTimeout(() => {
+    console.error('Could not close connections in time, forcefully shutting down');
+    process.exit(1);
+  }, 10000);
+}
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
