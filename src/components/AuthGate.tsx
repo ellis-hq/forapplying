@@ -1,6 +1,8 @@
 import { useState, useEffect, ReactNode } from 'react'
 import { User } from '@supabase/supabase-js'
 import { supabase, UserProfile } from '../lib/supabase'
+import BetaSignupModal from './BetaSignupModal'
+import { Sparkles } from 'lucide-react'
 
 type AuthGateProps = {
   children: (
@@ -18,7 +20,9 @@ export default function AuthGate({ children }: AuthGateProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+
   const [authLoading, setAuthLoading] = useState(false)
+  const [showBetaModal, setShowBetaModal] = useState(false)
 
   const DOWNLOAD_LIMIT = 5
 
@@ -212,6 +216,29 @@ export default function AuthGate({ children }: AuthGateProps) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
         <div className="w-full max-w-md">
+          {/* Early Access Banner */}
+          <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl shadow-lg p-6 mb-6 text-white relative overflow-hidden">
+            <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-white opacity-10 rounded-full blur-xl"></div>
+            <div className="relative z-10">
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles className="w-5 h-5 text-indigo-200" />
+                <span className="text-xs font-bold uppercase tracking-wider text-indigo-100 bg-indigo-500/30 px-2 py-0.5 rounded-full border border-indigo-400/30">
+                  Early Access
+                </span>
+              </div>
+              <h3 className="font-bold text-lg mb-1">Curated Beta Program</h3>
+              <p className="text-indigo-100 text-sm mb-4 leading-relaxed">
+                We're currently accepting a limited number of new users into our exclusive early access phase.
+              </p>
+              <button
+                onClick={() => setShowBetaModal(true)}
+                className="w-full bg-white text-indigo-600 px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-indigo-50 transition shadow-sm"
+              >
+                Request Invite
+              </button>
+            </div>
+          </div>
+
           <div className="bg-white rounded-2xl shadow-xl p-8">
             <div className="text-center mb-8">
               <h1 className="text-3xl font-bold text-gray-900">Welcome to Forapplying</h1>
@@ -307,6 +334,7 @@ export default function AuthGate({ children }: AuthGateProps) {
             </div>
           </div>
         </div>
+        <BetaSignupModal isOpen={showBetaModal} onClose={() => setShowBetaModal(false)} />
       </div>
     )
   }
@@ -378,9 +406,8 @@ export default function AuthGate({ children }: AuthGateProps) {
                     <div className="w-24">
                       <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                         <div
-                          className={`h-full rounded-full transition-all ${
-                            downloadsRemaining <= 1 ? 'bg-amber-500' : 'bg-blue-600'
-                          }`}
+                          className={`h-full rounded-full transition-all ${downloadsRemaining <= 1 ? 'bg-amber-500' : 'bg-blue-600'
+                            }`}
                           style={{ width: `${100 - progressPercentage}%` }}
                         ></div>
                       </div>
@@ -408,9 +435,8 @@ export default function AuthGate({ children }: AuthGateProps) {
             </div>
             <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
               <div
-                className={`h-full rounded-full transition-all ${
-                  downloadsRemaining <= 1 ? 'bg-amber-500' : 'bg-blue-600'
-                }`}
+                className={`h-full rounded-full transition-all ${downloadsRemaining <= 1 ? 'bg-amber-500' : 'bg-blue-600'
+                  }`}
                 style={{ width: `${100 - progressPercentage}%` }}
               ></div>
             </div>

@@ -46,7 +46,8 @@
       "Bash(bash:*)",
       "Bash(env:*)",
       "Bash(chmod:*)",
-      "Bash(/tmp/test-server.sh)"
+      "Bash(/tmp/test-server.sh)",
+      "Bash(node -e:*)"
     ]
   }
 }
