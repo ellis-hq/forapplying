@@ -72,9 +72,11 @@ function getAllowedOrigins() {
 export function applyCors(req, res, methods = 'POST, OPTIONS') {
   const allowedOrigins = getAllowedOrigins();
   const origin = req.headers.origin;
+  const host = req.headers.host;
+  const sameOrigin = origin && host ? origin === `https://${host}` : false;
 
   if (origin) {
-    if (allowedOrigins.length > 0 && allowedOrigins.includes(origin)) {
+    if ((allowedOrigins.length > 0 && allowedOrigins.includes(origin)) || sameOrigin) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Vary', 'Origin');
     } else if (allowedOrigins.length > 0) {
