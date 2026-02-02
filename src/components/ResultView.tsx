@@ -433,10 +433,15 @@ const ResultView: React.FC<ResultViewProps> = ({
                       <div key={i} className="flex justify-between items-baseline">
                         <div>
                           <span className="font-bold">{cert.name}</span>
-                          {cert.issuer && <span className="text-text-muted"> — {cert.issuer}</span>}
+                          {(cert.issuer || cert.type) && (
+                            <span className="text-text-muted">
+                              {cert.issuer && ` — ${cert.issuer}`}
+                              {cert.type && ` • ${cert.type === 'license' ? 'License' : 'Certification'}`}
+                            </span>
+                          )}
                         </div>
                         <span className="text-text-muted text-xs italic">
-                          {cert.dateObtained}
+                          {cert.dateObtained && `Issued: ${cert.dateObtained}`}
                           {cert.expirationDate && !cert.noExpiration && ` (Exp: ${cert.expirationDate})`}
                         </span>
                       </div>

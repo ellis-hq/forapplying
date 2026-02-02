@@ -271,7 +271,9 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({
   const storageKey = storageKeyOverride || STORAGE_KEY;
   const isOnePageMode = builderMode === 'onePage';
   // Load from localStorage or use initial data
-  console.log('[DATE-DEBUG] ResumeBuilder mount, initialData:', initialData ? { expCount: initialData.experience?.length, exp0: initialData.experience?.[0] ? { dateRange: initialData.experience[0].dateRange, startMonth: initialData.experience[0].startMonth, startYear: initialData.experience[0].startYear } : 'none' } : 'null');
+  if (import.meta.env.DEV) {
+    console.log('[DATE-DEBUG] ResumeBuilder mount, initialData:', initialData ? { expCount: initialData.experience?.length, exp0: initialData.experience?.[0] ? { dateRange: initialData.experience[0].dateRange, startMonth: initialData.experience[0].startMonth, startYear: initialData.experience[0].startYear } : 'none' } : 'null');
+  }
   const [resume, setResume] = useState<TailoredResumeData>(() => {
     if (initialData) return hydrateInitialData({ ...createEmptyResume(), ...initialData });
     const saved = localStorage.getItem(storageKey);

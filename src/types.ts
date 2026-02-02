@@ -32,6 +32,7 @@ export interface ResumeProject {
 }
 
 export interface ResumeCertification {
+  type?: 'certification' | 'license';
   name: string;
   issuer: string;
   dateObtained: string;

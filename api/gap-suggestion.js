@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { applyCors, enforceRateLimit, requireSupabaseAuth } from './_utils.js';
 
 function sanitizeString(str) {
   if (typeof str !== 'string') return '';
@@ -68,11 +69,7 @@ Respond with ONLY the suggested text, no quotes, no explanation.`;
 }
 
 export default async function handler(req, res) {
-  // Set CORS headers
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (!applyCors(req, res, 'POST, OPTIONS')) return;
 
   // Handle preflight
   if (req.method === 'OPTIONS') {
@@ -83,6 +80,10 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  if (!enforceRateLimit(req, res)) return;
+
+  if (!(await requireSupabaseAuth(req, res)).ok) return;
 
   // Check API key
   if (!process.env.ANTHROPIC_API_KEY) {

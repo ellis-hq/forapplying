@@ -26,6 +26,29 @@ interface ParsedDate {
   year: number;
 }
 
+function parseYear(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (/^\d{4}$/.test(trimmed)) return parseInt(trimmed, 10);
+  if (/^\d{2}$/.test(trimmed)) {
+    const yy = parseInt(trimmed, 10);
+    const currentYear = new Date().getFullYear() % 100;
+    const century = yy <= currentYear + 1 ? 2000 : 1900;
+    return century + yy;
+  }
+  return null;
+}
+
+function parseMonth(value: string): number | null {
+  const trimmed = value.trim().toLowerCase().replace(/\.$/, '');
+  if (!trimmed) return null;
+  if (/^\d{1,2}$/.test(trimmed)) {
+    const num = parseInt(trimmed, 10);
+    return num >= 1 && num <= 12 ? num : null;
+  }
+  return MONTH_MAP[trimmed] || null;
+}
+
 /**
  * Parse a date string into month/year components
  * Handles formats like "May 2024", "05/2024", "2024-05", etc.
@@ -41,32 +64,40 @@ export function parseEmploymentDate(dateStr: string): ParsedDate | null {
     return { month: now.getMonth() + 1, year: now.getFullYear() };
   }
 
-  // Try "Month Year" format (e.g., "May 2024", "January 2023")
+  // Try "Month Year" format (e.g., "May 2024", "January 2023", "May 24")
   for (const [name, num] of Object.entries(MONTH_MAP)) {
     if (str.includes(name)) {
-      const yearMatch = str.match(/\b(19|20)\d{2}\b/);
+      const yearMatch = str.match(/\b(\d{2}|\d{4})\b/);
       if (yearMatch) {
-        return { month: num, year: parseInt(yearMatch[0], 10) };
+        const year = parseYear(yearMatch[0]);
+        if (year) {
+          return { month: num, year };
+        }
       }
     }
   }
 
-  // Try "MM/YYYY" or "MM-YYYY" format
-  const slashMatch = str.match(/(\d{1,2})[\/\-](\d{4})/);
+  // Try "MM/YYYY" or "MM-YYYY" format (also supports MM/YY)
+  const slashMatch = str.match(/(\d{1,2})[\/\-](\d{2,4})/);
   if (slashMatch) {
-    return { month: parseInt(slashMatch[1], 10), year: parseInt(slashMatch[2], 10) };
+    const month = parseMonth(slashMatch[1]);
+    const year = parseYear(slashMatch[2]);
+    if (month && year) return { month, year };
   }
 
-  // Try "YYYY-MM" format
-  const isoMatch = str.match(/(\d{4})[\/\-](\d{1,2})/);
+  // Try "YYYY-MM" format (also supports YY-MM)
+  const isoMatch = str.match(/(\d{2,4})[\/\-](\d{1,2})/);
   if (isoMatch) {
-    return { month: parseInt(isoMatch[2], 10), year: parseInt(isoMatch[1], 10) };
+    const year = parseYear(isoMatch[1]);
+    const month = parseMonth(isoMatch[2]);
+    if (month && year) return { month, year };
   }
 
   // Try just year (assume January)
-  const yearOnly = str.match(/\b(19|20)\d{2}\b/);
+  const yearOnly = str.match(/\b(\d{2}|\d{4})\b/);
   if (yearOnly) {
-    return { month: 1, year: parseInt(yearOnly[0], 10) };
+    const year = parseYear(yearOnly[0]);
+    if (year) return { month: 1, year };
   }
 
   return null;
@@ -94,7 +125,7 @@ function parseDateRange(dateRange: string): { start: ParsedDate | null; end: Par
   if (!dateRange) return { start: null, end: null };
 
   // Split on common separators
-  const parts = dateRange.split(/\s*[-–—]\s*/);
+  const parts = dateRange.split(/\s*(?:[-–—]|\bto\b|\bthrough\b|\bthru\b|\buntil\b)\s*/i);
 
   if (parts.length >= 2) {
     return {
@@ -114,9 +145,14 @@ function parseDateRange(dateRange: string): { start: ParsedDate | null; end: Par
 function getExperienceDates(exp: ResumeExperience): { start: ParsedDate | null; end: ParsedDate | null } {
   // First try structured fields
   if (exp.startMonth && exp.startYear) {
+    const startMonth = parseMonth(exp.startMonth);
+    const startYear = parseYear(exp.startYear);
+    if (!startMonth || !startYear) {
+      return parseDateRange(exp.dateRange);
+    }
     const start: ParsedDate = {
-      month: parseInt(exp.startMonth, 10) || 1,
-      year: parseInt(exp.startYear, 10)
+      month: startMonth,
+      year: startYear
     };
 
     let end: ParsedDate;
@@ -124,10 +160,17 @@ function getExperienceDates(exp: ResumeExperience): { start: ParsedDate | null; 
       const now = new Date();
       end = { month: now.getMonth() + 1, year: now.getFullYear() };
     } else if (exp.endMonth && exp.endYear) {
+      const endMonth = parseMonth(exp.endMonth);
+      const endYear = parseYear(exp.endYear);
+      if (!endMonth || !endYear) {
+        const parsed = parseDateRange(exp.dateRange);
+        end = parsed.end || start;
+      } else {
       end = {
-        month: parseInt(exp.endMonth, 10) || 12,
-        year: parseInt(exp.endYear, 10)
+        month: endMonth,
+        year: endYear
       };
+      }
     } else {
       // Use dateRange as fallback for end
       const parsed = parseDateRange(exp.dateRange);
@@ -147,9 +190,14 @@ function getExperienceDates(exp: ResumeExperience): { start: ParsedDate | null; 
 function getEducationDates(edu: ResumeEducation): { start: ParsedDate | null; end: ParsedDate | null } {
   // First try structured fields
   if (edu.startMonth && edu.startYear) {
+    const startMonth = parseMonth(edu.startMonth);
+    const startYear = parseYear(edu.startYear);
+    if (!startMonth || !startYear) {
+      return parseDateRange(edu.dateRange);
+    }
     const start: ParsedDate = {
-      month: parseInt(edu.startMonth, 10) || 1,
-      year: parseInt(edu.startYear, 10)
+      month: startMonth,
+      year: startYear
     };
 
     let end: ParsedDate;
@@ -157,10 +205,17 @@ function getEducationDates(edu: ResumeEducation): { start: ParsedDate | null; en
       const now = new Date();
       end = { month: now.getMonth() + 1, year: now.getFullYear() };
     } else if (edu.endMonth && edu.endYear) {
+      const endMonth = parseMonth(edu.endMonth);
+      const endYear = parseYear(edu.endYear);
+      if (!endMonth || !endYear) {
+        const parsed = parseDateRange(edu.dateRange);
+        end = parsed.end || start;
+      } else {
       end = {
-        month: parseInt(edu.endMonth, 10) || 12,
-        year: parseInt(edu.endYear, 10)
+        month: endMonth,
+        year: endYear
       };
+      }
     } else {
       const parsed = parseDateRange(edu.dateRange);
       end = parsed.end || start;

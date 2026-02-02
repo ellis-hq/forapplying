@@ -287,12 +287,15 @@ const renderCertifications = (b: PDFBuilder, certifications: ResumeCertification
     b.ensureSpace(20);
     b.doc.setFont(CONFIG.font, 'bold');
     b.doc.setFontSize(CONFIG.sizes.body);
-    const certText = cert.issuer ? `${cert.name}, ${cert.issuer}` : cert.name;
+    const certTypeLabel = cert.type ? (cert.type === 'license' ? 'License' : 'Certification') : '';
+    const certText = cert.issuer
+      ? `${cert.name}, ${cert.issuer}${certTypeLabel ? ` (${certTypeLabel})` : ''}`
+      : `${cert.name}${certTypeLabel ? ` (${certTypeLabel})` : ''}`;
 
     // Calculate date text and available width
     const dateText = cert.dateObtained ? (
-      cert.noExpiration ? `${cert.dateObtained} (No Expiration)` :
-      cert.expirationDate ? `${cert.dateObtained} - ${cert.expirationDate}` : cert.dateObtained
+      cert.noExpiration ? `Issued: ${cert.dateObtained} (No Expiration)` :
+      cert.expirationDate ? `Issued: ${cert.dateObtained} (Exp: ${cert.expirationDate})` : `Issued: ${cert.dateObtained}`
     ) : '';
 
     b.doc.setFont(CONFIG.font, 'normal');

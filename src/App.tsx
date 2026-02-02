@@ -60,6 +60,7 @@ function splitDateRangeParts(dateRange: string): { startPart: string; endPart: s
   return { startPart: trimmed, endPart: '' };
 }
 
+
 function parseDatePart(s: string): { month: string; year: string } {
   if (!s) return { month: '', year: '' };
   const slashMatch = s.match(/^(\d{1,2})\/(\d{4})$/);
@@ -78,10 +79,14 @@ function parseDatePart(s: string): { month: string; year: string } {
 }
 
 function normalizeResumeDates(resume: TailoredResumeData): TailoredResumeData {
-  console.log('[DATE-DEBUG] normalizeResumeDates called with', resume.experience?.length, 'experience entries');
+  if (import.meta.env.DEV) {
+    console.log('[DATE-DEBUG] normalizeResumeDates called with', resume.experience?.length, 'experience entries');
+  }
   const hydrateEntry = (entry: any, currentKey: 'isCurrentRole' | 'isInProgress') => {
     const dateRange = entry.dateRange || '';
-    console.log('[DATE-DEBUG] hydrateEntry input:', { dateRange, startMonth: entry.startMonth, startYear: entry.startYear });
+    if (import.meta.env.DEV) {
+      console.log('[DATE-DEBUG] hydrateEntry input:', { dateRange, startMonth: entry.startMonth, startYear: entry.startYear });
+    }
     const { startPart, endPart } = splitDateRangeParts(dateRange);
     const start = parseDatePart(startPart);
     const isCurrent = /present|current/i.test(endPart);
@@ -94,7 +99,9 @@ function normalizeResumeDates(resume: TailoredResumeData): TailoredResumeData {
     const startStr = startMonth && startYear ? `${startMonth} ${startYear}` : startYear || '';
     const endStr = isCurrentValue ? 'Present' : (endMonth && endYear ? `${endMonth} ${endYear}` : endYear || '');
     const newDateRange = startStr && endStr ? `${startStr} – ${endStr}` : startStr || endStr || dateRange;
-    console.log('[DATE-DEBUG] hydrateEntry output:', { startMonth, startYear, endMonth, endYear, isCurrentValue, dateRange: newDateRange });
+    if (import.meta.env.DEV) {
+      console.log('[DATE-DEBUG] hydrateEntry output:', { startMonth, startYear, endMonth, endYear, isCurrentValue, dateRange: newDateRange });
+    }
     return { ...entry, startMonth, startYear, endMonth, endYear, [currentKey]: isCurrentValue, dateRange: newDateRange };
   };
   return {

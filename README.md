@@ -45,6 +45,8 @@ Edit `.env` and fill in your values:
 ```env
 # Backend (server-side only - keep secret!)
 ANTHROPIC_API_KEY=sk-ant-api03-your-key-here
+ALLOWED_ORIGINS=http://localhost:5173
+SUPABASE_JWT_SECRET=your-supabase-jwt-secret-here
 
 # Frontend (client-side)
 VITE_SUPABASE_URL=https://your-project.supabase.co
@@ -163,8 +165,9 @@ For production, you'll need to:
 
 1. Deploy the backend separately (e.g., on Railway, Render, or AWS)
 2. Set `VITE_API_URL` to point to your production backend URL
-3. Set `CORS_ORIGIN` to your production frontend URL
-4. Build and deploy the frontend (e.g., on Vercel, Netlify)
+3. Set `ALLOWED_ORIGINS` to your production frontend URL(s)
+4. Set `SUPABASE_JWT_SECRET` so serverless endpoints can verify auth tokens
+5. Build and deploy the frontend (e.g., on Vercel, Netlify)
 
 ## License
 

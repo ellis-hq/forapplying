@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import Anthropic from '@anthropic-ai/sdk';
 import dotenv from 'dotenv';
+import { requireSupabaseAuth } from '../api/_utils.js';
 
 
 
@@ -11,6 +12,15 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+app.set('trust proxy', 1);
+
+const derivedOrigin = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '';
+const defaultOrigins =
+  process.env.NODE_ENV === 'production' ? derivedOrigin : 'http://localhost:5173';
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || process.env.CORS_ORIGIN || defaultOrigins)
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean);
 
 // Validate required environment variables
 if (!process.env.ANTHROPIC_API_KEY) {
@@ -57,6 +67,12 @@ function rateLimit(req, res, next) {
 
   // Increment count
   record.count++;
+  next();
+}
+
+async function requireAuth(req, res, next) {
+  const result = await requireSupabaseAuth(req, res);
+  if (!result.ok) return;
   next();
 }
 
@@ -189,9 +205,13 @@ function validateGapSuggestionRequest(req, res, next) {
 // MIDDLEWARE
 // =============================================================================
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(null, false);
+  },
   methods: ['POST'],
-  allowedHeaders: ['Content-Type'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
 app.use(express.json({ limit: '1mb' }));
@@ -677,7 +697,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // Main resume tailoring endpoint
-app.post('/api/tailor', validateTailorRequest, async (req, res) => {
+app.post('/api/tailor', requireAuth, validateTailorRequest, async (req, res) => {
   try {
     const { resumeText, jobDescription, companyName, mode, resumeStyle, objective } = req.body;
 
@@ -738,7 +758,7 @@ app.post('/api/tailor', validateTailorRequest, async (req, res) => {
 });
 
 // Gap suggestion endpoint
-app.post('/api/gap-suggestion', validateGapSuggestionRequest, async (req, res) => {
+app.post('/api/gap-suggestion', requireAuth, validateGapSuggestionRequest, async (req, res) => {
   try {
     const { skill, resume, targetSection, jobDescription } = req.body;
 
@@ -769,7 +789,7 @@ app.post('/api/gap-suggestion', validateGapSuggestionRequest, async (req, res) =
 });
 
 // Employment gap suggestion endpoint
-app.post('/api/employment-gap-suggestion', async (req, res) => {
+app.post('/api/employment-gap-suggestion', requireAuth, async (req, res) => {
   try {
     const { gap, resume, jobDescription = '' } = req.body;
 
@@ -826,6 +846,137 @@ app.post('/api/employment-gap-suggestion', async (req, res) => {
   }
 });
 
+// Convert to one-page endpoint
+app.post('/api/convert-one-page', requireAuth, async (req, res) => {
+  try {
+    const { resumeData, jobDescription } = req.body;
+
+    if (!resumeData || !jobDescription) {
+      return res.status(400).json({ error: 'Missing required fields: resumeData and jobDescription are required.' });
+    }
+
+    if (typeof resumeData !== 'object') {
+      return res.status(400).json({ error: 'Invalid resumeData. Must be an object.' });
+    }
+
+    if (typeof jobDescription !== 'string') {
+      return res.status(400).json({ error: 'Invalid jobDescription. Must be a string.' });
+    }
+
+    const sanitizedJobDesc = sanitizeString(jobDescription);
+
+    const systemPrompt = `You are converting a multi-page resume into a concise 1-page version while maintaining ATS optimization.
+
+You must respond ONLY with valid JSON - no markdown, no code blocks, no explanation text.
+
+CRITICAL REQUIREMENTS:
+- The output must be SHORT ENOUGH to fit on ONE PAGE when rendered as a PDF with 0.75" margins, 10pt body font, and standard spacing
+- This means: max 3-4 bullet points per role, max 3-4 most relevant roles, concise summary (2-3 lines)
+- Preserve all critical keywords from the job description
+- Keep all quantified achievements (numbers, %, $, metrics)
+- Remove generic/soft skill statements
+- Combine similar experiences where appropriate
+- Prioritize most recent and most relevant experience
+
+CONTENT PRIORITIZATION (what to keep vs cut):
+1. KEEP: Quantified achievements with measurable impact
+2. KEEP: Technical skills and tools directly matching job requirements
+3. KEEP: Recent experience (last 5-7 years prioritized)
+4. KEEP: Leadership and cross-functional work relevant to the role
+5. CUT: Objective statements and references
+6. CUT: Excessive education details (keep degree, school, dates only)
+7. CUT: Older roles (10+ years) unless highly relevant
+8. CUT: Generic bullets that don't differentiate the candidate
+9. CUT: Redundant skills already demonstrated in experience
+10. CUT: Volunteer, publications, awards unless directly relevant to the job
+
+SECTION LENGTH TARGETS (to fit one page):
+- Summary: 2-3 sentences max
+- Skills: Keep only the most relevant tools and core skills (max 8-10 each)
+- Experience: 3-4 roles max, 3-4 bullets each
+- Education: 1-2 entries, one line each
+- Certifications: Only if directly relevant, max 2-3
+- Other optional sections: Include ONLY if highly relevant and space permits
+
+CRITICAL DATE PRESERVATION:
+- PRESERVE THE EXACT DATE FORMAT from the original resume
+- Preserve full date ranges including months
+
+ABSOLUTE GUARDRAILS:
+1. NEVER fabricate responsibilities, achievements, or experiences
+2. NEVER add tools, technologies, or skills not in the original
+3. NEVER change job titles, company names, dates, or metrics
+4. NEVER invent specific metrics, percentages, or dollar amounts
+5. The output must be a CONDENSED version of the SAME TRUTH`;
+
+    const userPrompt = `Convert the following resume to a 1-page version optimized for the given job description.
+
+RESUME DATA:
+${JSON.stringify(resumeData, null, 2)}
+
+JOB DESCRIPTION:
+${sanitizedJobDesc}
+
+Respond with ONLY a valid JSON object matching this structure (no markdown, no code blocks):
+{
+  "contact": { "name": "", "email": "", "phone": "", "location": "", "linkedin": "" },
+  "summary": "concise 2-3 sentence summary",
+  "skills": { "tools": ["max 8-10"], "core": ["max 8-10"] },
+  "experience": [{ "company": "", "role": "", "location": "", "dateRange": "", "bullets": ["3-4 max"] }],
+  "education": [{ "school": "", "degree": "", "fieldOfStudy": "", "dateRange": "", "location": "" }],
+  "certifications": [{ "name": "", "issuer": "", "dateObtained": "", "expirationDate": "", "noExpiration": false }],
+  "includeCertifications": false,
+  "includeObjective": false,
+  "includeProjects": false,
+  "includeVolunteer": false,
+  "includePublications": false,
+  "includeClinicalHours": false,
+  "includeLanguages": false,
+  "includeAwards": false
+}
+
+IMPORTANT: Keep output CONCISE. It must fit on a single page. When in doubt, CUT content.`;
+
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 8192,
+      messages: [{ role: 'user', content: userPrompt }],
+      system: systemPrompt,
+    });
+
+    const textContent = response.content.find(block => block.type === 'text');
+    if (!textContent || textContent.type !== 'text') {
+      return res.status(500).json({ error: 'Failed to process your request. Please try again.' });
+    }
+
+    let jsonText = textContent.text.trim();
+    if (jsonText.startsWith('```json')) {
+      jsonText = jsonText.slice(7);
+    } else if (jsonText.startsWith('```')) {
+      jsonText = jsonText.slice(3);
+    }
+    if (jsonText.endsWith('```')) {
+      jsonText = jsonText.slice(0, -3);
+    }
+    jsonText = jsonText.trim();
+
+    try {
+      const result = JSON.parse(jsonText);
+      res.json(result);
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError.message);
+      res.status(500).json({ error: 'Failed to process the response. Please try again.' });
+    }
+  } catch (error) {
+    console.error('Convert one-page API error:', error.message);
+    if (error.status === 429) {
+      res.status(429).json({ error: 'Service is temporarily busy. Please try again in a moment.' });
+    } else {
+      res.status(500).json({ error: 'An error occurred while processing your request. Please try again.' });
+    }
+  }
+});
+
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({ error: 'Endpoint not found' });
@@ -848,6 +999,7 @@ const server = app.listen(PORT, () => {
   console.log('  POST /api/tailor');
   console.log('  POST /api/gap-suggestion');
   console.log('  POST /api/employment-gap-suggestion');
+  console.log('  POST /api/convert-one-page');
 });
 
 // Graceful shutdown

@@ -1,7 +1,14 @@
 import { TailorResponse, RewriteMode, TailoredResumeData, GapTargetSection, ResumeStyle, EmploymentGap, EmploymentGapSuggestion } from "../types";
+import { supabase } from "../lib/supabase";
 
 // Backend API URL - uses Vite proxy in development
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 export async function tailorResume(
   originalResumeText: string,
@@ -10,10 +17,12 @@ export async function tailorResume(
   mode: RewriteMode,
   resumeStyle: ResumeStyle = ResumeStyle.CLASSIC
 ): Promise<TailorResponse> {
+  const authHeaders = await getAuthHeaders();
   const response = await fetch(`${API_BASE_URL}/tailor`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...authHeaders,
     },
     body: JSON.stringify({
       resumeText: originalResumeText,
@@ -42,10 +51,12 @@ export async function generateGapSuggestion(
   targetSection: GapTargetSection,
   jobDescription: string
 ): Promise<string> {
+  const authHeaders = await getAuthHeaders();
   const response = await fetch(`${API_BASE_URL}/gap-suggestion`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...authHeaders,
     },
     body: JSON.stringify({
       skill,
@@ -72,10 +83,12 @@ export async function generateEmploymentGapSuggestions(
   resume: TailoredResumeData,
   jobDescription: string
 ): Promise<EmploymentGapSuggestion[]> {
+  const authHeaders = await getAuthHeaders();
   const response = await fetch(`${API_BASE_URL}/employment-gap-suggestion`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...authHeaders,
     },
     body: JSON.stringify({
       gap,
@@ -100,10 +113,12 @@ export async function convertToOnePage(
   resumeData: TailoredResumeData,
   jobDescription: string
 ): Promise<TailoredResumeData> {
+  const authHeaders = await getAuthHeaders();
   const response = await fetch(`${API_BASE_URL}/convert-one-page`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...authHeaders,
     },
     body: JSON.stringify({
       resumeData,

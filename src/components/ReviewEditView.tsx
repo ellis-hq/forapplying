@@ -452,6 +452,7 @@ const ReviewEditView: React.FC<ReviewEditViewProps> = ({
 
   const addCertification = () => {
     const newCert: ResumeCertification = {
+      type: 'certification',
       name: '',
       issuer: '',
       dateObtained: '',
@@ -710,6 +711,17 @@ const ReviewEditView: React.FC<ReviewEditViewProps> = ({
                               placeholder="e.g., State Board of Nursing"
                               className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-accent focus:border-transparent"
                             />
+                            <div className="mt-3">
+                              <label className="block text-xs text-text-muted mb-1">Type</label>
+                              <select
+                                value={cert.type || 'certification'}
+                                onChange={(e) => updateCertification(index, 'type', e.target.value)}
+                                className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-accent focus:border-transparent bg-white"
+                              >
+                                <option value="certification">Certification</option>
+                                <option value="license">License</option>
+                              </select>
+                            </div>
                           </div>
                         </div>
                         <div className="grid grid-cols-2 gap-3">
@@ -782,13 +794,17 @@ const ReviewEditView: React.FC<ReviewEditViewProps> = ({
                             <p className="text-sm font-medium text-text-primary">
                               {cert.name || <span className="italic text-text-muted">Unnamed Certification</span>}
                             </p>
-                            {cert.issuer && (
-                              <p className="text-xs text-text-muted">{cert.issuer}</p>
+                            {(cert.issuer || cert.type) && (
+                              <p className="text-xs text-text-muted">
+                                {cert.issuer || ''}
+                                {cert.issuer && cert.type && ' • '}
+                                {cert.type ? (cert.type === 'license' ? 'License' : 'Certification') : ''}
+                              </p>
                             )}
                           </div>
                           <div className="text-right">
                             {cert.dateObtained && (
-                              <p className="text-xs text-text-secondary">{cert.dateObtained}</p>
+                              <p className="text-xs text-text-secondary">Issued: {cert.dateObtained}</p>
                             )}
                             {cert.noExpiration ? (
                               <p className="text-xs text-success">No Expiration</p>
@@ -984,10 +1000,15 @@ const ReviewEditView: React.FC<ReviewEditViewProps> = ({
                       <div key={i} className="flex justify-between items-baseline">
                         <div>
                           <span className="font-bold">{cert.name}</span>
-                          {cert.issuer && <span className="text-text-muted"> — {cert.issuer}</span>}
+                          {(cert.issuer || cert.type) && (
+                            <span className="text-text-muted">
+                              {cert.issuer && ` — ${cert.issuer}`}
+                              {cert.type && ` • ${cert.type === 'license' ? 'License' : 'Certification'}`}
+                            </span>
+                          )}
                         </div>
                         <span className="text-text-muted text-xs italic">
-                          {cert.dateObtained}
+                          {cert.dateObtained && `Issued: ${cert.dateObtained}`}
                           {cert.expirationDate && !cert.noExpiration && ` (Exp: ${cert.expirationDate})`}
                         </span>
                       </div>
