@@ -92,3 +92,30 @@ export async function generateEmploymentGapSuggestions(
   const result = await response.json();
   return result.suggestions as EmploymentGapSuggestion[];
 }
+
+/**
+ * Convert a tailored resume to a condensed 1-page version
+ */
+export async function convertToOnePage(
+  resumeData: TailoredResumeData,
+  jobDescription: string
+): Promise<TailoredResumeData> {
+  const response = await fetch(`${API_BASE_URL}/convert-one-page`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      resumeData,
+      jobDescription,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to convert to one page. Please try again.');
+  }
+
+  const result = await response.json();
+  return result as TailoredResumeData;
+}
