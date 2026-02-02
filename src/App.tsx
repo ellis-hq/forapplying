@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { User } from '@supabase/supabase-js';
 import { extractTextFromPDF, generateATSPDF, generateCoverLetterPDF } from './services/pdfService';
-import { tailorResume as tailorResumeAPI, generateGapSuggestion, generateEmploymentGapSuggestions } from './services/claudeService';
+import { tailorResume as tailorResumeAPI, generateGapSuggestion, generateEmploymentGapSuggestions, convertToOnePage as convertToOnePageAPI } from './services/claudeService';
 import {
   TailorResponse,
   RewriteMode,
@@ -32,6 +32,78 @@ type ResumeTailorProps = {
   onDownload: () => Promise<void>;
 };
 
+// Normalize date formats in resume data to "Month Year" format (e.g., "January 2020")
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const MONTH_ABBREV_MAP: Record<string, string> = {
+  'jan': 'January', 'feb': 'February', 'mar': 'March', 'apr': 'April',
+  'may': 'May', 'jun': 'June', 'jul': 'July', 'aug': 'August',
+  'sep': 'September', 'sept': 'September', 'oct': 'October', 'nov': 'November', 'dec': 'December'
+};
+
+function isSingleDateToken(value: string): boolean {
+  const s = value.trim();
+  if (!s) return true;
+  return (
+    /^\d{4}-\d{1,2}$/.test(s) || // YYYY-MM
+    /^\d{1,2}\/\d{4}$/.test(s) || // MM/YYYY
+    /^\d{4}$/.test(s) || // YYYY
+    /^[A-Za-z]+\.?\s+\d{4}$/.test(s) // Month YYYY / Mon YYYY / Sept. YYYY
+  );
+}
+
+function splitDateRangeParts(dateRange: string): { startPart: string; endPart: string } {
+  const trimmed = dateRange.trim();
+  if (!trimmed) return { startPart: '', endPart: '' };
+  if (isSingleDateToken(trimmed)) return { startPart: trimmed, endPart: '' };
+  const rangeMatch = trimmed.match(/^(.+?)\s*[–—-]\s*(.+)$/);
+  if (rangeMatch) return { startPart: rangeMatch[1].trim(), endPart: rangeMatch[2].trim() };
+  return { startPart: trimmed, endPart: '' };
+}
+
+function parseDatePart(s: string): { month: string; year: string } {
+  if (!s) return { month: '', year: '' };
+  const slashMatch = s.match(/^(\d{1,2})\/(\d{4})$/);
+  if (slashMatch) return { month: MONTHS[parseInt(slashMatch[1], 10) - 1] || '', year: slashMatch[2] };
+  const isoMatch = s.match(/^(\d{4})-(\d{1,2})$/);
+  if (isoMatch) return { month: MONTHS[parseInt(isoMatch[2], 10) - 1] || '', year: isoMatch[1] };
+  const wordMatch = s.match(/^([A-Za-z]+)\.?\s+(\d{4})$/);
+  if (wordMatch) {
+    const normalized = wordMatch[1].toLowerCase().replace(/[^a-z]/g, '');
+    const full = MONTH_ABBREV_MAP[normalized] || MONTHS.find(m => m.toLowerCase() === normalized) || '';
+    return { month: full, year: wordMatch[2] };
+  }
+  const yearMatch = s.match(/^(\d{4})$/);
+  if (yearMatch) return { month: '', year: yearMatch[1] };
+  return { month: '', year: '' };
+}
+
+function normalizeResumeDates(resume: TailoredResumeData): TailoredResumeData {
+  console.log('[DATE-DEBUG] normalizeResumeDates called with', resume.experience?.length, 'experience entries');
+  const hydrateEntry = (entry: any, currentKey: 'isCurrentRole' | 'isInProgress') => {
+    const dateRange = entry.dateRange || '';
+    console.log('[DATE-DEBUG] hydrateEntry input:', { dateRange, startMonth: entry.startMonth, startYear: entry.startYear });
+    const { startPart, endPart } = splitDateRangeParts(dateRange);
+    const start = parseDatePart(startPart);
+    const isCurrent = /present|current/i.test(endPart);
+    const end = isCurrent ? { month: '', year: '' } : parseDatePart(endPart);
+    const startMonth = entry.startMonth || start.month;
+    const startYear = entry.startYear || start.year;
+    const endMonth = entry.endMonth || end.month;
+    const endYear = entry.endYear || end.year;
+    const isCurrentValue = entry[currentKey] ?? isCurrent;
+    const startStr = startMonth && startYear ? `${startMonth} ${startYear}` : startYear || '';
+    const endStr = isCurrentValue ? 'Present' : (endMonth && endYear ? `${endMonth} ${endYear}` : endYear || '');
+    const newDateRange = startStr && endStr ? `${startStr} – ${endStr}` : startStr || endStr || dateRange;
+    console.log('[DATE-DEBUG] hydrateEntry output:', { startMonth, startYear, endMonth, endYear, isCurrentValue, dateRange: newDateRange });
+    return { ...entry, startMonth, startYear, endMonth, endYear, [currentKey]: isCurrentValue, dateRange: newDateRange };
+  };
+  return {
+    ...resume,
+    experience: resume.experience.map(entry => hydrateEntry(entry, 'isCurrentRole')),
+    education: resume.education.map(entry => hydrateEntry(entry, 'isInProgress')),
+  };
+}
+
 const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }) => {
   const [file, setFile] = useState<File | null>(null);
   const [jobDesc, setJobDesc] = useState('');
@@ -48,6 +120,8 @@ const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }
   const [employmentGaps, setEmploymentGaps] = useState<EmploymentGap[]>([]);
   const [gapResolutions, setGapResolutions] = useState<EmploymentGapResolutionState[]>([]);
   const [previousView, setPreviousView] = useState<AppView>(AppView.WELCOME);
+  const [onePageResume, setOnePageResume] = useState<TailoredResumeData | null>(null);
+  const [isConverting, setIsConverting] = useState(false);
 
   const matchScore = useMemo(() => {
     if (!result) return 0;
@@ -221,6 +295,8 @@ const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }
       }
 
       const tailoringResult = await tailorResumeAPI(resumeText, jobDesc, company, mode, resumeStyle);
+      // Normalize all dates to "Month Year" format before storing
+      tailoringResult.resume = normalizeResumeDates(tailoringResult.resume);
       setResult(tailoringResult);
       setCurrentView(AppView.REVIEW); // Go to review screen after generation
     } catch (err: unknown) {
@@ -258,6 +334,34 @@ const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }
     doc.save(`Cover_Letter_${company.replace(/\s+/g, '_')}.pdf`);
   };
 
+  const handleConvertToOnePage = async () => {
+    if (!result) return;
+    const resumeData = editedResume || result.resume;
+    setIsConverting(true);
+    setError(null);
+    try {
+      const onePage = await convertToOnePageAPI(resumeData, jobDesc);
+      setOnePageResume(normalizeResumeDates(onePage));
+    } catch (err: unknown) {
+      console.error(err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to convert to one page.';
+      setError(errorMessage);
+    } finally {
+      setIsConverting(false);
+    }
+  };
+
+  const downloadOnePageResume = async () => {
+    if (!onePageResume) return;
+    try {
+      await onDownload();
+    } catch (err) {
+      console.error('Failed to track download:', err);
+    }
+    const doc = generateATSPDF(onePageResume);
+    doc.save(`${onePageResume.contact.name.replace(/\s+/g, '_')}_Resume_1Page_${company.replace(/\s+/g, '_')}.pdf`);
+  };
+
   const reset = () => {
     setResult(null);
     setFile(null);
@@ -272,6 +376,8 @@ const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }
     setBuiltResume(null);
     setEmploymentGaps([]);
     setGapResolutions([]);
+    setOnePageResume(null);
+    setIsConverting(false);
   };
 
   // Handler for selecting entry mode from welcome screen
@@ -321,6 +427,11 @@ const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }
     setCurrentView(AppView.BUILDER);
   };
 
+  const handleEditOnePageResume = () => {
+    if (!onePageResume) return;
+    setCurrentView(AppView.ONE_PAGE_BUILDER);
+  };
+
   // Handler for generating gap suggestions via Claude API
   const handleGenerateSuggestion = useCallback(async (skill: string, targetSection: GapTargetSection): Promise<string> => {
     if (!result) throw new Error('No resume data available');
@@ -344,6 +455,15 @@ const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }
     setGapResolutions(resolutions);
     setCurrentView(AppView.RESULT);
   }, []);
+
+  const handleOnePageBuilderContinue = (resume: TailoredResumeData) => {
+    setOnePageResume(resume);
+    setCurrentView(AppView.RESULT);
+  };
+
+  const handleBackFromOnePageBuilder = () => {
+    setCurrentView(AppView.RESULT);
+  };
 
   // Create a modified result with edited resume for ResultView
   const resultForDisplay = useMemo(() => {
@@ -370,6 +490,18 @@ const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }
           setResumeStyle={setResumeStyle}
           onContinue={handleBuilderContinue}
           onBack={handleBackToWelcome}
+        />
+      )}
+
+      {currentView === AppView.ONE_PAGE_BUILDER && onePageResume && (
+        <ResumeBuilder
+          initialData={onePageResume}
+          resumeStyle={resumeStyle}
+          setResumeStyle={setResumeStyle}
+          onContinue={handleOnePageBuilderContinue}
+          onBack={handleBackFromOnePageBuilder}
+          builderMode="onePage"
+          storageKeyOverride="forapply_onepage_builder_data"
         />
       )}
 
@@ -416,6 +548,11 @@ const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }
           company={company}
           employmentGaps={employmentGaps}
           gapResolutions={gapResolutions}
+          onConvertToOnePage={handleConvertToOnePage}
+          onEditOnePage={handleEditOnePageResume}
+          onePageResume={onePageResume}
+          isConverting={isConverting}
+          downloadOnePageResume={downloadOnePageResume}
         />
       )}
 

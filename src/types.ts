@@ -173,6 +173,7 @@ export enum AppView {
   WELCOME = 'welcome',
   INPUT = 'input',
   BUILDER = 'builder',
+  ONE_PAGE_BUILDER = 'onePageBuilder',
   REVIEW = 'review',
   RESULT = 'result',
   ABOUT = 'about'

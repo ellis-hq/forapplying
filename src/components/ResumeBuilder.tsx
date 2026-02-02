@@ -48,6 +48,8 @@ interface ResumeBuilderProps {
   setResumeStyle: (style: ResumeStyle) => void;
   onContinue: (resume: TailoredResumeData) => void;
   onBack: () => void;
+  builderMode?: 'full' | 'onePage';
+  storageKeyOverride?: string;
 }
 
 const MONTHS = [
@@ -59,7 +61,139 @@ const YEARS = Array.from({ length: 50 }, (_, i) => (new Date().getFullYear() - i
 
 const STORAGE_KEY = 'forapply_resume_builder_data';
 
-// Helper to create date range string from month/year
+const MONTH_ABBREVS: Record<string, string> = {
+  'jan': 'January', 'feb': 'February', 'mar': 'March', 'apr': 'April',
+  'may': 'May', 'jun': 'June', 'jul': 'July', 'aug': 'August',
+  'sep': 'September', 'sept': 'September', 'oct': 'October', 'nov': 'November', 'dec': 'December'
+};
+
+function resolveMonth(input: string): string {
+  if (!input) return '';
+  const normalized = input.toLowerCase().replace(/[^a-z]/g, '');
+  const full = MONTHS.find(m => m.toLowerCase() === normalized);
+  if (full) return full;
+  return MONTH_ABBREVS[normalized] || '';
+}
+
+function isSingleDateToken(value: string): boolean {
+  const s = value.trim();
+  if (!s) return true;
+  return (
+    /^\d{4}-\d{1,2}$/.test(s) || // YYYY-MM
+    /^\d{1,2}\/\d{4}$/.test(s) || // MM/YYYY
+    /^\d{4}$/.test(s) || // YYYY
+    /^[A-Za-z]+\.?\s+\d{4}$/.test(s) // Month YYYY / Mon YYYY / Sept. YYYY
+  );
+}
+
+// Helper to parse a dateRange string back into month/year components
+function parseDateRange(dateRange?: string): {
+  startMonth: string; startYear: string; endMonth: string; endYear: string; isCurrent: boolean;
+} {
+  const result = { startMonth: '', startYear: '', endMonth: '', endYear: '', isCurrent: false };
+  if (!dateRange) return result;
+
+  const trimmed = dateRange.trim();
+  let startPart = trimmed;
+  let endPart = '';
+
+  if (!isSingleDateToken(trimmed)) {
+    const rangeMatch = trimmed.match(/^(.+?)\s*[–—-]\s*(.+)$/);
+    if (rangeMatch) {
+      startPart = rangeMatch[1].trim();
+      endPart = rangeMatch[2].trim();
+    }
+  }
+
+  const parseDate = (s: string): { month: string; year: string } => {
+    if (!s) return { month: '', year: '' };
+    // Try "Month Year" or "Mon Year" (e.g., "January 2020" or "Jan 2020")
+    const monthYearMatch = s.match(/^([A-Za-z]+)\.?\s+(\d{4})$/);
+    if (monthYearMatch) {
+      return { month: resolveMonth(monthYearMatch[1]), year: monthYearMatch[2] };
+    }
+    // Try "MM/YYYY" format (e.g., "02/2020")
+    const slashMatch = s.match(/^(\d{1,2})\/(\d{4})$/);
+    if (slashMatch) {
+      const monthIdx = parseInt(slashMatch[1], 10) - 1;
+      return { month: MONTHS[monthIdx] || '', year: slashMatch[2] };
+    }
+    // Try "YYYY-MM" format (e.g., "2019-05")
+    const isoMatch = s.match(/^(\d{4})-(\d{1,2})$/);
+    if (isoMatch) {
+      const monthIdx = parseInt(isoMatch[2], 10) - 1;
+      return { month: MONTHS[monthIdx] || '', year: isoMatch[1] };
+    }
+    // Try year only (e.g., "2020")
+    const yearMatch = s.match(/^(\d{4})$/);
+    if (yearMatch) {
+      return { month: '', year: yearMatch[1] };
+    }
+    return { month: '', year: '' };
+  };
+
+  const start = parseDate(startPart);
+  result.startMonth = start.month;
+  result.startYear = start.year;
+
+  if (/present|current/i.test(endPart)) {
+    result.isCurrent = true;
+  } else {
+    const end = parseDate(endPart);
+    result.endMonth = end.month;
+    result.endYear = end.year;
+  }
+
+  return result;
+}
+
+// Helper to hydrate date fields on experience/education entries loaded from initialData
+function hydrateInitialData(data: TailoredResumeData): TailoredResumeData {
+  return {
+    ...data,
+    experience: (data.experience || []).map(exp => {
+      const parsed = parseDateRange(exp.dateRange);
+      const startMonth = exp.startMonth || parsed.startMonth;
+      const startYear = exp.startYear || parsed.startYear;
+      const endMonth = exp.endMonth || parsed.endMonth;
+      const endYear = exp.endYear || parsed.endYear;
+      const isCurrentRole = exp.isCurrentRole ?? parsed.isCurrent;
+      return {
+        ...exp,
+        startMonth,
+        startYear,
+        endMonth,
+        endYear,
+        isCurrentRole,
+        // Reformat dateRange to match user's preferred format
+        dateRange: (startMonth && startYear)
+          ? formatDateRange(startMonth, startYear, endMonth, endYear, isCurrentRole)
+          : exp.dateRange,
+      };
+    }),
+    education: (data.education || []).map(edu => {
+      const parsed = parseDateRange(edu.dateRange);
+      const startMonth = edu.startMonth || parsed.startMonth;
+      const startYear = edu.startYear || parsed.startYear;
+      const endMonth = edu.endMonth || parsed.endMonth;
+      const endYear = edu.endYear || parsed.endYear;
+      const isInProgress = edu.isInProgress ?? parsed.isCurrent;
+      return {
+        ...edu,
+        startMonth,
+        startYear,
+        endMonth,
+        endYear,
+        isInProgress,
+        dateRange: (startMonth && startYear)
+          ? formatDateRange(startMonth, startYear, endMonth, endYear, isInProgress)
+          : edu.dateRange,
+      };
+    }),
+  };
+}
+
+// Helper to create date range string from month/year (always uses "Month Year" format)
 function formatDateRange(
   startMonth?: string,
   startYear?: string,
@@ -70,6 +204,25 @@ function formatDateRange(
   const start = startMonth && startYear ? `${startMonth} ${startYear}` : startYear || '';
   const end = isCurrent ? 'Present' : (endMonth && endYear ? `${endMonth} ${endYear}` : endYear || '');
   return start && end ? `${start} – ${end}` : start || end;
+}
+
+function getDisplayDateRange(
+  dateRange: string | undefined,
+  startMonth?: string,
+  startYear?: string,
+  endMonth?: string,
+  endYear?: string,
+  isCurrent?: boolean
+): string {
+  if (startMonth || startYear || endMonth || endYear || isCurrent) {
+    return formatDateRange(startMonth, startYear, endMonth, endYear, isCurrent);
+  }
+  if (!dateRange) return '';
+  const parsed = parseDateRange(dateRange);
+  if (!parsed.startMonth && !parsed.startYear && !parsed.endMonth && !parsed.endYear && !parsed.isCurrent) {
+    return dateRange;
+  }
+  return formatDateRange(parsed.startMonth, parsed.startYear, parsed.endMonth, parsed.endYear, parsed.isCurrent);
 }
 
 // Empty resume template
@@ -111,15 +264,20 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({
   resumeStyle,
   setResumeStyle,
   onContinue,
-  onBack
+  onBack,
+  builderMode = 'full',
+  storageKeyOverride
 }) => {
+  const storageKey = storageKeyOverride || STORAGE_KEY;
+  const isOnePageMode = builderMode === 'onePage';
   // Load from localStorage or use initial data
+  console.log('[DATE-DEBUG] ResumeBuilder mount, initialData:', initialData ? { expCount: initialData.experience?.length, exp0: initialData.experience?.[0] ? { dateRange: initialData.experience[0].dateRange, startMonth: initialData.experience[0].startMonth, startYear: initialData.experience[0].startYear } : 'none' } : 'null');
   const [resume, setResume] = useState<TailoredResumeData>(() => {
-    if (initialData) return { ...createEmptyResume(), ...initialData };
-    const saved = localStorage.getItem(STORAGE_KEY);
+    if (initialData) return hydrateInitialData({ ...createEmptyResume(), ...initialData });
+    const saved = localStorage.getItem(storageKey);
     if (saved) {
       try {
-        return { ...createEmptyResume(), ...JSON.parse(saved) };
+        return hydrateInitialData({ ...createEmptyResume(), ...JSON.parse(saved) });
       } catch {
         return createEmptyResume();
       }
@@ -131,13 +289,22 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({
   const [skillInput, setSkillInput] = useState({ core: '', tools: '' });
   const [languageInput, setLanguageInput] = useState('');
 
+  // Hydrate date fields from dateRange if they're missing (e.g., when editing a tailored resume)
+  useEffect(() => {
+    if (!initialData) return;
+    // Force hydrate: replace resume state with fully hydrated version of initialData
+    const hydrated = hydrateInitialData({ ...createEmptyResume(), ...initialData });
+    setResume(hydrated);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialData]);
+
   // Auto-save to localStorage
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(resume));
+      localStorage.setItem(storageKey, JSON.stringify(resume));
     }, 500);
     return () => clearTimeout(timeoutId);
-  }, [resume]);
+  }, [resume, storageKey]);
 
   // Update functions
   const updateContact = useCallback((field: keyof TailoredResumeData['contact'], value: string) => {
@@ -532,7 +699,7 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({
   // Clear and start over
   const handleClearAll = () => {
     if (confirm('Are you sure you want to clear all data and start over? This cannot be undone.')) {
-      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(storageKey);
       setResume(createEmptyResume());
     }
   };
@@ -555,8 +722,14 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-text-primary">Resume Builder</h1>
-          <p className="text-sm text-text-muted">Fill in your information. Your progress is auto-saved.</p>
+          <h1 className="text-xl font-bold text-text-primary">
+            {isOnePageMode ? 'One-Page Resume Builder' : 'Resume Builder'}
+          </h1>
+          <p className="text-sm text-text-muted">
+            {isOnePageMode
+              ? 'Edit your one-page version. Auto-saved separately.'
+              : 'Fill in your information. Your progress is auto-saved.'}
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -1698,6 +1871,7 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({
               ))}
             </div>
           </section>
+
         </div>
 
         {/* Right Column - Preview */}
@@ -1776,7 +1950,16 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({
                           <div key={i}>
                             <div className="flex justify-between items-baseline mb-0.5">
                               <h4 className="font-bold text-[10px] uppercase">{exp.company || 'Company Name'}</h4>
-                              <span className="font-bold italic text-[9px]">{exp.dateRange}</span>
+                              <span className="font-bold italic text-[9px]">
+                                {getDisplayDateRange(
+                                  exp.dateRange,
+                                  exp.startMonth,
+                                  exp.startYear,
+                                  exp.endMonth,
+                                  exp.endYear,
+                                  exp.isCurrentRole
+                                )}
+                              </span>
                             </div>
                             <div className="flex justify-between items-baseline mb-1 italic text-text-secondary">
                               <span>{exp.role || 'Job Title'}</span>
@@ -1809,7 +1992,16 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({
                               <p>{edu.degree}{edu.fieldOfStudy ? ` in ${edu.fieldOfStudy}` : ''}</p>
                             </div>
                             <div className="text-right">
-                              <p className="font-bold italic">{edu.dateRange}</p>
+                              <p className="font-bold italic">
+                                {getDisplayDateRange(
+                                  edu.dateRange,
+                                  edu.startMonth,
+                                  edu.startYear,
+                                  edu.endMonth,
+                                  edu.endYear,
+                                  edu.isInProgress
+                                )}
+                              </p>
                               <p className="italic text-text-muted">{edu.location}</p>
                             </div>
                           </div>

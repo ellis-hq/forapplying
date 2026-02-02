@@ -8,9 +8,10 @@ import {
   Loader2,
   CheckCircle,
   AlertTriangle,
-  Calendar
+  Calendar,
+  Scissors
 } from 'lucide-react';
-import { TailorResponse, EmploymentGap, EmploymentGapResolutionState, EditableResumeData } from '../types';
+import { TailorResponse, TailoredResumeData, EmploymentGap, EmploymentGapResolutionState, EditableResumeData } from '../types';
 import { generateGapSummary } from '../utils/employmentGapDetector';
 import ConfirmationModal from './ConfirmationModal';
 
@@ -22,6 +23,11 @@ interface ResultViewProps {
   company: string;
   employmentGaps?: EmploymentGap[];
   gapResolutions?: EmploymentGapResolutionState[];
+  onConvertToOnePage?: () => Promise<void>;
+  onEditOnePage?: () => void;
+  onePageResume?: TailoredResumeData | null;
+  isConverting?: boolean;
+  downloadOnePageResume?: () => Promise<void>;
 }
 
 const ScoreCircle: React.FC<{ score: number }> = ({ score }) => (
@@ -41,11 +47,19 @@ const ResultView: React.FC<ResultViewProps> = ({
   downloadCoverLetter,
   employmentGaps = [],
   gapResolutions = [],
+  onConvertToOnePage,
+  onEditOnePage,
+  onePageResume,
+  isConverting = false,
+  downloadOnePageResume,
 }) => {
   const [isDownloadingResume, setIsDownloadingResume] = useState(false);
   const [isDownloadingCoverLetter, setIsDownloadingCoverLetter] = useState(false);
+  const [isDownloadingOnePage, setIsDownloadingOnePage] = useState(false);
   const [showResumeConfirm, setShowResumeConfirm] = useState(false);
   const [showCoverLetterConfirm, setShowCoverLetterConfirm] = useState(false);
+  const [showOnePageConfirm, setShowOnePageConfirm] = useState(false);
+  const [activeTab, setActiveTab] = useState<'full' | 'onePage'>('full');
 
   // Compute employment gap summary
   const gapSummary = useMemo(() =>
@@ -80,6 +94,24 @@ const ResultView: React.FC<ResultViewProps> = ({
       setIsDownloadingCoverLetter(false);
     }
   };
+
+  const handleOnePageClick = () => {
+    setShowOnePageConfirm(true);
+  };
+
+  const handleConfirmOnePageDownload = async () => {
+    setShowOnePageConfirm(false);
+    if (!downloadOnePageResume) return;
+    setIsDownloadingOnePage(true);
+    try {
+      await downloadOnePageResume();
+    } finally {
+      setIsDownloadingOnePage(false);
+    }
+  };
+
+  // The resume data to display based on active tab
+  const displayResume = activeTab === 'onePage' && onePageResume ? onePageResume : result.resume;
 
   return (
     <main className="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-4 gap-8 animate-fade-in">
@@ -175,70 +207,140 @@ const ResultView: React.FC<ResultViewProps> = ({
       {/* Resume Preview */}
       <section className="lg:col-span-3 space-y-6">
         <div className="bg-surface rounded-2xl shadow-sm border border-border overflow-hidden">
-          <div className="bg-border-light px-6 py-4 border-b border-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex gap-4">
-              <div className="flex items-center gap-2 text-accent font-bold text-sm">
-                <FileBadge className="w-4 h-4" /> Optimized Output
+          <div className="bg-border-light px-6 py-4 border-b border-border flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex gap-4">
+                <div className="flex items-center gap-2 text-accent font-bold text-sm">
+                  <FileBadge className="w-4 h-4" /> Optimized Output
+                </div>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {activeTab === 'onePage' && onePageResume ? (
+                  <button
+                    onClick={handleOnePageClick}
+                    disabled={isDownloadingOnePage}
+                    className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover disabled:bg-accent/70 text-white rounded-lg text-sm font-bold shadow-sm transition-all disabled:cursor-not-allowed"
+                  >
+                    {isDownloadingOnePage ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Download className="w-4 h-4" />
+                    )}
+                    {isDownloadingOnePage ? 'Downloading...' : 'Download 1-Page Resume'}
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={handleResumeClick}
+                      disabled={isDownloadingResume}
+                      className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover disabled:bg-accent/70 text-white rounded-lg text-sm font-bold shadow-sm transition-all disabled:cursor-not-allowed"
+                    >
+                      {isDownloadingResume ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Download className="w-4 h-4" />
+                      )}
+                      {isDownloadingResume ? 'Downloading...' : 'Download Resume'}
+                    </button>
+                    <button
+                      onClick={handleCoverLetterClick}
+                      disabled={isDownloadingCoverLetter}
+                      className="flex items-center gap-2 px-4 py-2 border border-border hover:bg-border-light disabled:bg-border-light/50 text-text-secondary rounded-lg text-sm font-bold transition-all disabled:cursor-not-allowed"
+                    >
+                      {isDownloadingCoverLetter ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Download className="w-4 h-4" />
+                      )}
+                      {isDownloadingCoverLetter ? 'Downloading...' : 'Cover Letter (Optional)'}
+                    </button>
+                  </>
+                )}
+                {onConvertToOnePage && !onePageResume && (
+                  <button
+                    onClick={onConvertToOnePage}
+                    disabled={isConverting}
+                    className="flex items-center gap-2 px-4 py-2 border border-accent text-accent hover:bg-accent hover:text-white disabled:border-accent/50 disabled:text-accent/50 rounded-lg text-sm font-bold transition-all disabled:cursor-not-allowed"
+                  >
+                    {isConverting ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Scissors className="w-4 h-4" />
+                    )}
+                    {isConverting ? 'Converting...' : 'Convert to 1-Page'}
+                  </button>
+                )}
+                {onePageResume && onEditOnePage && (
+                  <button
+                    onClick={onEditOnePage}
+                    className="flex items-center gap-2 px-4 py-2 border border-border hover:bg-border-light text-text-secondary rounded-lg text-sm font-bold transition-all"
+                  >
+                    <FileText className="w-4 h-4" />
+                    Edit 1-Page
+                  </button>
+                )}
               </div>
             </div>
-            <div className="flex gap-2 flex-wrap">
-              <button
-                onClick={handleResumeClick}
-                disabled={isDownloadingResume}
-                className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover disabled:bg-accent/70 text-white rounded-lg text-sm font-bold shadow-sm transition-all disabled:cursor-not-allowed"
-              >
-                {isDownloadingResume ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Download className="w-4 h-4" />
-                )}
-                {isDownloadingResume ? 'Downloading...' : 'Download Resume'}
-              </button>
-              <button
-                onClick={handleCoverLetterClick}
-                disabled={isDownloadingCoverLetter}
-                className="flex items-center gap-2 px-4 py-2 border border-border hover:bg-border-light disabled:bg-border-light/50 text-text-secondary rounded-lg text-sm font-bold transition-all disabled:cursor-not-allowed"
-              >
-                {isDownloadingCoverLetter ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Download className="w-4 h-4" />
-                )}
-                {isDownloadingCoverLetter ? 'Downloading...' : 'Cover Letter (Optional)'}
-              </button>
-            </div>
+            {/* Tab toggle when one-page version exists */}
+            {onePageResume && (
+              <div className="flex items-center gap-2">
+                <div className="flex bg-border rounded-lg p-0.5">
+                  <button
+                    onClick={() => setActiveTab('full')}
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                      activeTab === 'full'
+                        ? 'bg-surface text-accent shadow-sm'
+                        : 'text-text-muted hover:text-text-secondary'
+                    }`}
+                  >
+                    Full Resume
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('onePage')}
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                      activeTab === 'onePage'
+                        ? 'bg-surface text-accent shadow-sm'
+                        : 'text-text-muted hover:text-text-secondary'
+                    }`}
+                  >
+                    1-Page Version
+                  </button>
+                </div>
+                <span className="text-[10px] text-success font-medium">Free during beta</span>
+              </div>
+            )}
           </div>
 
           <div className="p-8 bg-surface max-h-[85vh] overflow-y-auto custom-scrollbar flex flex-col items-center">
             {/* Visual Representation of the Tailored Resume */}
             <div className="w-full max-w-[700px] shadow-sm border border-border p-12 bg-surface text-text-primary text-[11px] leading-relaxed">
               <div className="text-center mb-8">
-                <h1 className="text-2xl font-bold uppercase mb-1 tracking-tight">{result.resume.contact.name}</h1>
-                {(result.resume as EditableResumeData).jobTitle && (
-                  <p className="text-sm text-text-secondary mb-1">{(result.resume as EditableResumeData).jobTitle}</p>
+                <h1 className="text-2xl font-bold uppercase mb-1 tracking-tight">{displayResume.contact.name}</h1>
+                {(displayResume as EditableResumeData).jobTitle && (
+                  <p className="text-sm text-text-secondary mb-1">{(displayResume as EditableResumeData).jobTitle}</p>
                 )}
                 <p className="text-text-muted">
-                  {result.resume.contact.email} • {result.resume.contact.phone} • {result.resume.contact.location}
+                  {displayResume.contact.email} • {displayResume.contact.phone} • {displayResume.contact.location}
                 </p>
               </div>
 
               <div className="mb-6">
                 <h3 className="text-xs font-bold uppercase border-b border-text-primary pb-0.5 mb-2">Professional Summary</h3>
-                <p>{result.resume.summary}</p>
+                <p>{displayResume.summary}</p>
               </div>
 
               <div className="mb-6">
                 <h3 className="text-xs font-bold uppercase border-b border-text-primary pb-0.5 mb-2">Technical Skills</h3>
                 <div className="space-y-1">
-                  <p><span className="font-bold">Core Competencies:</span> {result.resume.skills.core.join(' • ')}</p>
-                  <p><span className="font-bold">Technologies & Tools:</span> {result.resume.skills.tools.join(' • ')}</p>
+                  <p><span className="font-bold">Core Competencies:</span> {displayResume.skills.core.join(' • ')}</p>
+                  <p><span className="font-bold">Technologies & Tools:</span> {displayResume.skills.tools.join(' • ')}</p>
                 </div>
               </div>
 
               <div className="mb-6">
                 <h3 className="text-xs font-bold uppercase border-b border-text-primary pb-0.5 mb-2">Experience</h3>
                 <div className="space-y-6">
-                  {result.resume.experience.map((exp, i) => (
+                  {displayResume.experience.map((exp, i) => (
                     <div key={i}>
                       <div className="flex justify-between items-baseline mb-0.5">
                         <h4 className="font-bold text-sm uppercase">{exp.company}</h4>
@@ -261,7 +363,7 @@ const ResultView: React.FC<ResultViewProps> = ({
               <div>
                 <h3 className="text-xs font-bold uppercase border-b border-text-primary pb-0.5 mb-2">Education</h3>
                 <div className="space-y-3">
-                  {result.resume.education.map((edu, i) => (
+                  {displayResume.education.map((edu, i) => (
                     <div key={i} className="flex justify-between items-start">
                       <div>
                         <p className="font-bold uppercase">{edu.school}</p>
@@ -277,13 +379,13 @@ const ResultView: React.FC<ResultViewProps> = ({
               </div>
 
               {/* Projects Section */}
-              {result.resume.includeProjects && result.resume.projects && result.resume.projects.length > 0 && (
+              {displayResume.includeProjects && displayResume.projects && displayResume.projects.length > 0 && (
                 <div className="mt-6">
                   <h3 className="text-xs font-bold uppercase border-b border-text-primary pb-0.5 mb-2">
                     Projects
                   </h3>
                   <div className="space-y-3">
-                    {result.resume.projects.map((proj, i) => (
+                    {displayResume.projects.map((proj, i) => (
                       <div key={i}>
                         <div className="flex justify-between items-baseline mb-0.5">
                           <h4 className="font-bold text-sm">{proj.name}</h4>
@@ -300,13 +402,13 @@ const ResultView: React.FC<ResultViewProps> = ({
               )}
 
               {/* Volunteer Section */}
-              {result.resume.includeVolunteer && result.resume.volunteer && result.resume.volunteer.length > 0 && (
+              {displayResume.includeVolunteer && displayResume.volunteer && displayResume.volunteer.length > 0 && (
                 <div className="mt-6">
                   <h3 className="text-xs font-bold uppercase border-b border-text-primary pb-0.5 mb-2">
                     Volunteer Work
                   </h3>
                   <div className="space-y-3">
-                    {result.resume.volunteer.map((vol, i) => (
+                    {displayResume.volunteer.map((vol, i) => (
                       <div key={i}>
                         <div className="flex justify-between items-baseline mb-0.5">
                           <h4 className="font-bold text-sm uppercase">{vol.organization}</h4>
@@ -321,13 +423,13 @@ const ResultView: React.FC<ResultViewProps> = ({
               )}
 
               {/* Certifications Section */}
-              {result.resume.includeCertifications && result.resume.certifications && result.resume.certifications.length > 0 && (
+              {displayResume.includeCertifications && displayResume.certifications && displayResume.certifications.length > 0 && (
                 <div className="mt-6">
                   <h3 className="text-xs font-bold uppercase border-b border-text-primary pb-0.5 mb-2">
                     Certifications
                   </h3>
                   <div className="space-y-2">
-                    {result.resume.certifications.map((cert, i) => (
+                    {displayResume.certifications.map((cert, i) => (
                       <div key={i} className="flex justify-between items-baseline">
                         <div>
                           <span className="font-bold">{cert.name}</span>
@@ -344,13 +446,13 @@ const ResultView: React.FC<ResultViewProps> = ({
               )}
 
               {/* Clinical Hours Section */}
-              {result.resume.includeClinicalHours && result.resume.clinicalHours && result.resume.clinicalHours.length > 0 && (
+              {displayResume.includeClinicalHours && displayResume.clinicalHours && displayResume.clinicalHours.length > 0 && (
                 <div className="mt-6">
                   <h3 className="text-xs font-bold uppercase border-b border-text-primary pb-0.5 mb-2">
                     Clinical Hours
                   </h3>
                   <div className="space-y-3">
-                    {result.resume.clinicalHours.map((clinical, i) => (
+                    {displayResume.clinicalHours.map((clinical, i) => (
                       <div key={i}>
                         <div className="flex justify-between items-baseline mb-0.5">
                           <h4 className="font-bold text-sm">{clinical.siteName}</h4>
@@ -367,13 +469,13 @@ const ResultView: React.FC<ResultViewProps> = ({
               )}
 
               {/* Publications Section */}
-              {result.resume.includePublications && result.resume.publications && result.resume.publications.length > 0 && (
+              {displayResume.includePublications && displayResume.publications && displayResume.publications.length > 0 && (
                 <div className="mt-6">
                   <h3 className="text-xs font-bold uppercase border-b border-text-primary pb-0.5 mb-2">
                     Publications
                   </h3>
                   <div className="space-y-2">
-                    {result.resume.publications.map((pub, i) => (
+                    {displayResume.publications.map((pub, i) => (
                       <div key={i}>
                         <p>
                           <span className="font-bold">{pub.title}</span>
@@ -390,23 +492,23 @@ const ResultView: React.FC<ResultViewProps> = ({
               )}
 
               {/* Languages Section */}
-              {result.resume.includeLanguages && result.resume.languages && result.resume.languages.length > 0 && (
+              {displayResume.includeLanguages && displayResume.languages && displayResume.languages.length > 0 && (
                 <div className="mt-6">
                   <h3 className="text-xs font-bold uppercase border-b border-text-primary pb-0.5 mb-2">
                     Languages
                   </h3>
-                  <p>{result.resume.languages.join(' • ')}</p>
+                  <p>{displayResume.languages.join(' • ')}</p>
                 </div>
               )}
 
               {/* Awards Section */}
-              {result.resume.includeAwards && result.resume.awards && result.resume.awards.length > 0 && (
+              {displayResume.includeAwards && displayResume.awards && displayResume.awards.length > 0 && (
                 <div className="mt-6">
                   <h3 className="text-xs font-bold uppercase border-b border-text-primary pb-0.5 mb-2">
                     Awards & Honors
                   </h3>
                   <div className="space-y-2">
-                    {result.resume.awards.map((award, i) => (
+                    {displayResume.awards.map((award, i) => (
                       <div key={i}>
                         <div className="flex justify-between items-baseline">
                           <span className="font-bold">{award.title}</span>
@@ -449,6 +551,13 @@ const ResultView: React.FC<ResultViewProps> = ({
         onConfirm={handleConfirmCoverLetterDownload}
         onCancel={() => setShowCoverLetterConfirm(false)}
         title="Download Cover Letter"
+        message="Are you sure you want to download? This will cost you 1 download."
+      />
+      <ConfirmationModal
+        isOpen={showOnePageConfirm}
+        onConfirm={handleConfirmOnePageDownload}
+        onCancel={() => setShowOnePageConfirm(false)}
+        title="Download 1-Page Resume"
         message="Are you sure you want to download? This will cost you 1 download."
       />
     </main>
