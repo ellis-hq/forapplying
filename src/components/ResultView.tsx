@@ -441,8 +441,13 @@ const ResultView: React.FC<ResultViewProps> = ({
                           )}
                         </div>
                         <span className="text-text-muted text-xs italic">
-                          {cert.dateObtained && `Issued: ${cert.dateObtained}`}
-                          {cert.expirationDate && !cert.noExpiration && ` (Exp: ${cert.expirationDate})`}
+                          {(() => {
+                            const issued = cert.dateObtained ? `Issued: ${cert.dateObtained}` : '';
+                            const exp = cert.noExpiration
+                              ? 'No Expiration'
+                              : cert.expirationDate ? `Exp: ${cert.expirationDate}` : '';
+                            return issued && exp ? `${issued} (${exp})` : issued || exp;
+                          })()}
                         </span>
                       </div>
                     ))}

@@ -58,6 +58,7 @@ const MONTHS = [
 ];
 
 const YEARS = Array.from({ length: 50 }, (_, i) => (new Date().getFullYear() - i).toString());
+const MAX_CERT_NAME_LENGTH = 47;
 
 const STORAGE_KEY = 'forapply_resume_builder_data';
 
@@ -81,6 +82,11 @@ function isSingleDateToken(value: string): boolean {
   return (
     /^\d{4}-\d{1,2}$/.test(s) || // YYYY-MM
     /^\d{1,2}\/\d{4}$/.test(s) || // MM/YYYY
+    /^\d{1,2}\/\d{2}$/.test(s) || // MM/YY
+    /^\d{1,2}-\d{4}$/.test(s) || // MM-YYYY
+    /^\d{1,2}\.\d{4}$/.test(s) || // MM.YYYY
+    /^\d{4}\/\d{1,2}$/.test(s) || // YYYY/MM
+    /^\d{4}\.\d{1,2}$/.test(s) || // YYYY.MM
     /^\d{4}$/.test(s) || // YYYY
     /^[A-Za-z]+\.?\s+\d{4}$/.test(s) // Month YYYY / Mon YYYY / Sept. YYYY
   );
@@ -102,13 +108,19 @@ function parseDateRange(dateRange?: string): {
     if (rangeMatch) {
       startPart = rangeMatch[1].trim();
       endPart = rangeMatch[2].trim();
+    } else {
+      const toMatch = trimmed.match(/^(.+?)\s+(?:to|through|until)\s+(.+)$/i);
+      if (toMatch) {
+        startPart = toMatch[1].trim();
+        endPart = toMatch[2].trim();
+      }
     }
   }
 
   const parseDate = (s: string): { month: string; year: string } => {
     if (!s) return { month: '', year: '' };
     // Try "Month Year" or "Mon Year" (e.g., "January 2020" or "Jan 2020")
-    const monthYearMatch = s.match(/^([A-Za-z]+)\.?\s+(\d{4})$/);
+    const monthYearMatch = s.match(/^([A-Za-z]+)\.?\s*[-/ ]?\s*(\d{4})$/);
     if (monthYearMatch) {
       return { month: resolveMonth(monthYearMatch[1]), year: monthYearMatch[2] };
     }
@@ -118,11 +130,51 @@ function parseDateRange(dateRange?: string): {
       const monthIdx = parseInt(slashMatch[1], 10) - 1;
       return { month: MONTHS[monthIdx] || '', year: slashMatch[2] };
     }
+    // Try "MM/YY" format (e.g., "02/20")
+    const slashShortYearMatch = s.match(/^(\d{1,2})\/(\d{2})$/);
+    if (slashShortYearMatch) {
+      const monthIdx = parseInt(slashShortYearMatch[1], 10) - 1;
+      const yearNum = parseInt(slashShortYearMatch[2], 10);
+      const year = Number.isNaN(yearNum) ? '' : (yearNum >= 70 ? `19${slashShortYearMatch[2]}` : `20${slashShortYearMatch[2]}`);
+      return { month: MONTHS[monthIdx] || '', year };
+    }
+    // Try "MM-YYYY" or "MM.YYYY"
+    const dashMatch = s.match(/^(\d{1,2})-(\d{4})$/);
+    if (dashMatch) {
+      const monthIdx = parseInt(dashMatch[1], 10) - 1;
+      return { month: MONTHS[monthIdx] || '', year: dashMatch[2] };
+    }
+    const dotMatch = s.match(/^(\d{1,2})\.(\d{4})$/);
+    if (dotMatch) {
+      const monthIdx = parseInt(dotMatch[1], 10) - 1;
+      return { month: MONTHS[monthIdx] || '', year: dotMatch[2] };
+    }
+    const spaceMatch = s.match(/^(\d{1,2})\s+(\d{4})$/);
+    if (spaceMatch) {
+      const monthIdx = parseInt(spaceMatch[1], 10) - 1;
+      return { month: MONTHS[monthIdx] || '', year: spaceMatch[2] };
+    }
     // Try "YYYY-MM" format (e.g., "2019-05")
     const isoMatch = s.match(/^(\d{4})-(\d{1,2})$/);
     if (isoMatch) {
       const monthIdx = parseInt(isoMatch[2], 10) - 1;
       return { month: MONTHS[monthIdx] || '', year: isoMatch[1] };
+    }
+    // Try "YYYY/MM" or "YYYY.MM" format (e.g., "2019/05")
+    const isoSlashMatch = s.match(/^(\d{4})\/(\d{1,2})$/);
+    if (isoSlashMatch) {
+      const monthIdx = parseInt(isoSlashMatch[2], 10) - 1;
+      return { month: MONTHS[monthIdx] || '', year: isoSlashMatch[1] };
+    }
+    const isoDotMatch = s.match(/^(\d{4})\.(\d{1,2})$/);
+    if (isoDotMatch) {
+      const monthIdx = parseInt(isoDotMatch[2], 10) - 1;
+      return { month: MONTHS[monthIdx] || '', year: isoDotMatch[1] };
+    }
+    const isoSpaceMatch = s.match(/^(\d{4})\s+(\d{1,2})$/);
+    if (isoSpaceMatch) {
+      const monthIdx = parseInt(isoSpaceMatch[2], 10) - 1;
+      return { month: MONTHS[monthIdx] || '', year: isoSpaceMatch[1] };
     }
     // Try year only (e.g., "2020")
     const yearMatch = s.match(/^(\d{4})$/);
@@ -190,6 +242,10 @@ function hydrateInitialData(data: TailoredResumeData): TailoredResumeData {
           : edu.dateRange,
       };
     }),
+    certifications: (data.certifications || []).map(cert => ({
+      ...cert,
+      name: cert.name ? cert.name.slice(0, MAX_CERT_NAME_LENGTH) : ''
+    })),
   };
 }
 
@@ -527,10 +583,13 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({
   };
 
   const updateCertification = (index: number, field: keyof ResumeCertification, value: ResumeCertification[keyof ResumeCertification]) => {
+    const nextValue = field === 'name' && typeof value === 'string'
+      ? value.slice(0, MAX_CERT_NAME_LENGTH)
+      : value;
     setResume(prev => ({
       ...prev,
       certifications: (prev.certifications || []).map((c, i) =>
-        i === index ? { ...c, [field]: value } : c
+        i === index ? { ...c, [field]: nextValue } : c
       )
     }));
   };
@@ -1376,8 +1435,12 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({
                             value={cert.name}
                             onChange={(e) => updateCertification(index, 'name', e.target.value)}
                             placeholder="Certification Name"
+                            maxLength={MAX_CERT_NAME_LENGTH}
                             className="px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-accent focus:border-transparent"
                           />
+                          <p className={`text-[10px] mt-1 ${cert.name.length >= MAX_CERT_NAME_LENGTH ? 'text-warning' : 'text-text-muted'}`}>
+                            {MAX_CERT_NAME_LENGTH - cert.name.length} characters remaining
+                          </p>
                           <input
                             type="text"
                             value={cert.issuer}
@@ -1405,7 +1468,13 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({
                               <input
                                 type="checkbox"
                                 checked={cert.noExpiration || false}
-                                onChange={(e) => updateCertification(index, 'noExpiration', e.target.checked)}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  updateCertification(index, 'noExpiration', checked);
+                                  if (checked) {
+                                    updateCertification(index, 'expirationDate', '');
+                                  }
+                                }}
                                 className="rounded border-border text-accent focus:ring-accent"
                               />
                               No Expiration
@@ -2046,7 +2115,14 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({
                           <p key={i}>
                             <span className="font-bold">{cert.name}</span>
                             {cert.issuer && `, ${cert.issuer}`}
-                            {cert.dateObtained && ` (${cert.dateObtained})`}
+                            {(() => {
+                              const issued = cert.dateObtained ? `Issued: ${cert.dateObtained}` : '';
+                              const exp = cert.noExpiration
+                                ? 'No Expiration'
+                                : cert.expirationDate ? `Exp: ${cert.expirationDate}` : '';
+                              const dateText = issued && exp ? `${issued} (${exp})` : issued || exp;
+                              return dateText ? ` — ${dateText}` : '';
+                            })()}
                           </p>
                         ))}
                       </div>

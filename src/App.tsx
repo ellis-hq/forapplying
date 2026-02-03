@@ -39,6 +39,21 @@ const MONTH_ABBREV_MAP: Record<string, string> = {
   'may': 'May', 'jun': 'June', 'jul': 'July', 'aug': 'August',
   'sep': 'September', 'sept': 'September', 'oct': 'October', 'nov': 'November', 'dec': 'December'
 };
+const MAX_CERT_NAME_LENGTH = 47;
+
+const clampCertificationName = (value: string) => value.slice(0, MAX_CERT_NAME_LENGTH);
+
+const resolveMonthNumber = (value: string): string => {
+  const monthIndex = parseInt(value, 10) - 1;
+  return MONTHS[monthIndex] || '';
+};
+
+const normalizeYear = (value: string): string => {
+  if (value.length !== 2) return value;
+  const yearNum = parseInt(value, 10);
+  if (Number.isNaN(yearNum)) return '';
+  return yearNum >= 70 ? `19${value}` : `20${value}`;
+};
 
 function isSingleDateToken(value: string): boolean {
   const s = value.trim();
@@ -46,6 +61,11 @@ function isSingleDateToken(value: string): boolean {
   return (
     /^\d{4}-\d{1,2}$/.test(s) || // YYYY-MM
     /^\d{1,2}\/\d{4}$/.test(s) || // MM/YYYY
+    /^\d{1,2}\/\d{2}$/.test(s) || // MM/YY
+    /^\d{1,2}-\d{4}$/.test(s) || // MM-YYYY
+    /^\d{1,2}\.\d{4}$/.test(s) || // MM.YYYY
+    /^\d{4}\/\d{1,2}$/.test(s) || // YYYY/MM
+    /^\d{4}\.\d{1,2}$/.test(s) || // YYYY.MM
     /^\d{4}$/.test(s) || // YYYY
     /^[A-Za-z]+\.?\s+\d{4}$/.test(s) // Month YYYY / Mon YYYY / Sept. YYYY
   );
@@ -57,6 +77,8 @@ function splitDateRangeParts(dateRange: string): { startPart: string; endPart: s
   if (isSingleDateToken(trimmed)) return { startPart: trimmed, endPart: '' };
   const rangeMatch = trimmed.match(/^(.+?)\s*[–—-]\s*(.+)$/);
   if (rangeMatch) return { startPart: rangeMatch[1].trim(), endPart: rangeMatch[2].trim() };
+  const toMatch = trimmed.match(/^(.+?)\s+(?:to|through|until)\s+(.+)$/i);
+  if (toMatch) return { startPart: toMatch[1].trim(), endPart: toMatch[2].trim() };
   return { startPart: trimmed, endPart: '' };
 }
 
@@ -64,10 +86,24 @@ function splitDateRangeParts(dateRange: string): { startPart: string; endPart: s
 function parseDatePart(s: string): { month: string; year: string } {
   if (!s) return { month: '', year: '' };
   const slashMatch = s.match(/^(\d{1,2})\/(\d{4})$/);
-  if (slashMatch) return { month: MONTHS[parseInt(slashMatch[1], 10) - 1] || '', year: slashMatch[2] };
+  if (slashMatch) return { month: resolveMonthNumber(slashMatch[1]), year: slashMatch[2] };
+  const slashShortYearMatch = s.match(/^(\d{1,2})\/(\d{2})$/);
+  if (slashShortYearMatch) return { month: resolveMonthNumber(slashShortYearMatch[1]), year: normalizeYear(slashShortYearMatch[2]) };
+  const dashMatch = s.match(/^(\d{1,2})-(\d{4})$/);
+  if (dashMatch) return { month: resolveMonthNumber(dashMatch[1]), year: dashMatch[2] };
+  const dotMatch = s.match(/^(\d{1,2})\.(\d{4})$/);
+  if (dotMatch) return { month: resolveMonthNumber(dotMatch[1]), year: dotMatch[2] };
+  const spaceMatch = s.match(/^(\d{1,2})\s+(\d{4})$/);
+  if (spaceMatch) return { month: resolveMonthNumber(spaceMatch[1]), year: spaceMatch[2] };
   const isoMatch = s.match(/^(\d{4})-(\d{1,2})$/);
-  if (isoMatch) return { month: MONTHS[parseInt(isoMatch[2], 10) - 1] || '', year: isoMatch[1] };
-  const wordMatch = s.match(/^([A-Za-z]+)\.?\s+(\d{4})$/);
+  if (isoMatch) return { month: resolveMonthNumber(isoMatch[2]), year: isoMatch[1] };
+  const isoSlashMatch = s.match(/^(\d{4})\/(\d{1,2})$/);
+  if (isoSlashMatch) return { month: resolveMonthNumber(isoSlashMatch[2]), year: isoSlashMatch[1] };
+  const isoDotMatch = s.match(/^(\d{4})\.(\d{1,2})$/);
+  if (isoDotMatch) return { month: resolveMonthNumber(isoDotMatch[2]), year: isoDotMatch[1] };
+  const isoSpaceMatch = s.match(/^(\d{4})\s+(\d{1,2})$/);
+  if (isoSpaceMatch) return { month: resolveMonthNumber(isoSpaceMatch[2]), year: isoSpaceMatch[1] };
+  const wordMatch = s.match(/^([A-Za-z]+)\.?\s*[-/ ]?\s*(\d{4})$/);
   if (wordMatch) {
     const normalized = wordMatch[1].toLowerCase().replace(/[^a-z]/g, '');
     const full = MONTH_ABBREV_MAP[normalized] || MONTHS.find(m => m.toLowerCase() === normalized) || '';
@@ -78,7 +114,7 @@ function parseDatePart(s: string): { month: string; year: string } {
   return { month: '', year: '' };
 }
 
-function normalizeResumeDates(resume: TailoredResumeData): TailoredResumeData {
+function normalizeResumeDates<T extends TailoredResumeData>(resume: T): T {
   if (import.meta.env.DEV) {
     console.log('[DATE-DEBUG] normalizeResumeDates called with', resume.experience?.length, 'experience entries');
   }
@@ -104,11 +140,18 @@ function normalizeResumeDates(resume: TailoredResumeData): TailoredResumeData {
     }
     return { ...entry, startMonth, startYear, endMonth, endYear, [currentKey]: isCurrentValue, dateRange: newDateRange };
   };
-  return {
+  const normalized = {
     ...resume,
     experience: resume.experience.map(entry => hydrateEntry(entry, 'isCurrentRole')),
     education: resume.education.map(entry => hydrateEntry(entry, 'isInProgress')),
-  };
+    certifications: resume.certifications
+      ? resume.certifications.map(cert => ({
+        ...cert,
+        name: cert.name ? clampCertificationName(cert.name.trim()) : ''
+      }))
+      : resume.certifications
+  } as T;
+  return normalized;
 }
 
 const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }) => {
@@ -218,7 +261,16 @@ const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }
     if (resume.includeCertifications && resume.certifications && resume.certifications.length > 0) {
       text += 'CERTIFICATIONS\n';
       resume.certifications.forEach(cert => {
-        text += `${cert.name}, ${cert.issuer} (${cert.dateObtained})\n`;
+        const detailParts: string[] = [];
+        if (cert.issuer) detailParts.push(cert.issuer);
+        if (cert.type) detailParts.push(cert.type === 'license' ? 'License' : 'Certification');
+        const metaParts: string[] = [];
+        if (cert.dateObtained) metaParts.push(`Issued: ${cert.dateObtained}`);
+        if (cert.noExpiration) metaParts.push('No Expiration');
+        else if (cert.expirationDate) metaParts.push(`Expires: ${cert.expirationDate}`);
+        const details = detailParts.length > 0 ? `, ${detailParts.join(' • ')}` : '';
+        const meta = metaParts.length > 0 ? ` (${metaParts.join('; ')})` : '';
+        text += `${cert.name}${details}${meta}\n`;
       });
       text += '\n';
     }
@@ -457,7 +509,7 @@ const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }
     gaps: EmploymentGap[],
     resolutions: EmploymentGapResolutionState[]
   ) => {
-    setEditedResume(edited);
+    setEditedResume(normalizeResumeDates(edited));
     setEmploymentGaps(gaps);
     setGapResolutions(resolutions);
     setCurrentView(AppView.RESULT);

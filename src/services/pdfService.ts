@@ -293,10 +293,20 @@ const renderCertifications = (b: PDFBuilder, certifications: ResumeCertification
       : `${cert.name}${certTypeLabel ? ` (${certTypeLabel})` : ''}`;
 
     // Calculate date text and available width
-    const dateText = cert.dateObtained ? (
-      cert.noExpiration ? `Issued: ${cert.dateObtained} (No Expiration)` :
-      cert.expirationDate ? `Issued: ${cert.dateObtained} (Exp: ${cert.expirationDate})` : `Issued: ${cert.dateObtained}`
-    ) : '';
+    let dateText = '';
+    if (cert.dateObtained) {
+      if (cert.noExpiration) {
+        dateText = `Issued: ${cert.dateObtained} (No Expiration)`;
+      } else if (cert.expirationDate) {
+        dateText = `Issued: ${cert.dateObtained} (Exp: ${cert.expirationDate})`;
+      } else {
+        dateText = `Issued: ${cert.dateObtained}`;
+      }
+    } else if (cert.noExpiration) {
+      dateText = 'No Expiration';
+    } else if (cert.expirationDate) {
+      dateText = `Exp: ${cert.expirationDate}`;
+    }
 
     b.doc.setFont(CONFIG.font, 'normal');
     const dateWidth = dateText ? b.doc.getTextWidth(dateText) : 0;

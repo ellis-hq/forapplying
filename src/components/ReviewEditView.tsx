@@ -45,6 +45,8 @@ interface ReviewEditViewProps {
   onEditResume?: () => void;
 }
 
+const MAX_CERT_NAME_LENGTH = 47;
+
 const ReviewEditView: React.FC<ReviewEditViewProps> = ({
   result,
   jobDescription,
@@ -468,10 +470,13 @@ const ReviewEditView: React.FC<ReviewEditViewProps> = ({
   };
 
   const updateCertification = (index: number, field: keyof ResumeCertification, value: string | boolean) => {
+    const nextValue = field === 'name' && typeof value === 'string'
+      ? value.slice(0, MAX_CERT_NAME_LENGTH)
+      : value;
     setEditedResume(prev => ({
       ...prev,
       certifications: (prev.certifications || []).map((cert, i) =>
-        i === index ? { ...cert, [field]: value } : cert
+        i === index ? { ...cert, [field]: nextValue } : cert
       )
     }));
   };
@@ -699,8 +704,12 @@ const ReviewEditView: React.FC<ReviewEditViewProps> = ({
                               value={cert.name}
                               onChange={(e) => updateCertification(index, 'name', e.target.value)}
                               placeholder="e.g., RN License, AWS Solutions Architect"
+                              maxLength={MAX_CERT_NAME_LENGTH}
                               className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-accent focus:border-transparent"
                             />
+                            <p className={`text-[10px] mt-1 ${cert.name.length >= MAX_CERT_NAME_LENGTH ? 'text-warning' : 'text-text-muted'}`}>
+                              {MAX_CERT_NAME_LENGTH - cert.name.length} characters remaining
+                            </p>
                           </div>
                           <div>
                             <label className="block text-xs text-text-muted mb-1">Issuing Organization</label>
@@ -1008,8 +1017,13 @@ const ReviewEditView: React.FC<ReviewEditViewProps> = ({
                           )}
                         </div>
                         <span className="text-text-muted text-xs italic">
-                          {cert.dateObtained && `Issued: ${cert.dateObtained}`}
-                          {cert.expirationDate && !cert.noExpiration && ` (Exp: ${cert.expirationDate})`}
+                          {(() => {
+                            const issued = cert.dateObtained ? `Issued: ${cert.dateObtained}` : '';
+                            const exp = cert.noExpiration
+                              ? 'No Expiration'
+                              : cert.expirationDate ? `Exp: ${cert.expirationDate}` : '';
+                            return issued && exp ? `${issued} (${exp})` : issued || exp;
+                          })()}
                         </span>
                       </div>
                     ))}
