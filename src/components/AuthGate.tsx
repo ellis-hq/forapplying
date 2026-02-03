@@ -223,18 +223,18 @@ export default function AuthGate({ children }: AuthGateProps) {
               <div className="flex items-center gap-2 mb-2">
                 <Sparkles className="w-5 h-5 text-indigo-200" />
                 <span className="text-xs font-bold uppercase tracking-wider text-indigo-100 bg-indigo-500/30 px-2 py-0.5 rounded-full border border-indigo-400/30">
-                  Early Access
+                  Pro Waitlist
                 </span>
               </div>
-              <h3 className="font-bold text-lg mb-1">Curated Beta Program</h3>
+              <h3 className="font-bold text-lg mb-1">Forapplying Pro (Coming Soon)</h3>
               <p className="text-indigo-100 text-sm mb-4 leading-relaxed">
-                We're currently accepting a limited number of new users into our exclusive early access phase.
+                Join the waitlist for Pro to unlock more downloads, access a future agent version, and get early access to upcoming features.
               </p>
               <button
                 onClick={() => setShowBetaModal(true)}
                 className="w-full bg-white text-indigo-600 px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-indigo-50 transition shadow-sm"
               >
-                Request Invite
+                Join Pro Waitlist
               </button>
             </div>
           </div>
@@ -244,6 +244,9 @@ export default function AuthGate({ children }: AuthGateProps) {
               <h1 className="text-3xl font-bold text-gray-900">Welcome to Forapplying</h1>
               <p className="text-gray-600 mt-3 text-sm leading-relaxed">
                 Optimize your resume to get past ATS systems and land more interviews. Free users get 5 downloads per day.
+              </p>
+              <p className="text-gray-500 mt-2 text-sm">
+                You're using the beta version. Sign-ups are currently limited.
               </p>
               <p className="text-gray-500 mt-4 text-sm">
                 {isLogin ? 'Sign in to continue' : 'Create your free account'}

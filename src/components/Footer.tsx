@@ -5,7 +5,7 @@ const Footer: React.FC = () => (
     <p className="mb-2 font-medium">
       Forapplying utilizes semantic mapping to bridge the gap between your unique experience and specific job requirements.
     </p>
-    <p>© {new Date().getFullYear()} Forapplying • Powered by Claude AI</p>
+    <p>© {new Date().getFullYear()} Forapplying</p>
   </footer>
 );
 

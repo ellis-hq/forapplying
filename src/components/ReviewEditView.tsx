@@ -502,6 +502,22 @@ const ReviewEditView: React.FC<ReviewEditViewProps> = ({
     <main className="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-5 gap-8 animate-fade-in">
       {/* Left Column - Gap Filler */}
       <section className="lg:col-span-2 space-y-6">
+        <div className="bg-accent-light p-6 rounded-2xl shadow-sm border border-accent-muted">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-4 h-4 text-accent mt-0.5" />
+            <div>
+              <h2 className="text-sm font-bold text-text-primary">Final edits</h2>
+              <p className="text-xs text-text-secondary mt-1">
+                This is your final edits page. Confirm or update dates for certifications, licenses, and other accolades.
+              </p>
+              <p className="text-xs text-text-secondary mt-2">
+                If you need to change your work history (titles, dates, or roles), use "Edit Resume in Builder."
+                That will require re-optimizing your resume and re-finalizing your accolades here.
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Job Title Card */}
         <div className="bg-surface p-6 rounded-2xl shadow-sm border border-border">
           <h2 className="text-sm font-bold text-text-primary mb-4 flex items-center gap-2">

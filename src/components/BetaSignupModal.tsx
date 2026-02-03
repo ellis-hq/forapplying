@@ -71,9 +71,9 @@ const BetaSignupModal: React.FC<BetaSignupModalProps> = ({ isOpen, onClose }) =>
                             <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
                                 <CheckCircle className="w-8 h-8" />
                             </div>
-                            <h3 className="text-2xl font-bold text-gray-900 mb-2">You're on the list!</h3>
+                            <h3 className="text-2xl font-bold text-gray-900 mb-2">You're on the Pro waitlist!</h3>
                             <p className="text-gray-600 mb-6">
-                                Thank you for your interest. We'll be in touch as soon as a spot opens up.
+                                Thank you for your interest. We'll let you know as soon as Pro is ready.
                             </p>
                             <button
                                 onClick={onClose}
@@ -88,10 +88,24 @@ const BetaSignupModal: React.FC<BetaSignupModalProps> = ({ isOpen, onClose }) =>
                                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 mb-4">
                                     <Sparkles className="w-6 h-6" />
                                 </div>
-                                <h2 className="text-2xl font-bold text-gray-900 mb-2">Request Early Access</h2>
+                                <h2 className="text-2xl font-bold text-gray-900 mb-2">Join the Pro Waitlist</h2>
                                 <p className="text-gray-600 text-sm leading-relaxed">
-                                    We're currently in a curated limited release. Join the waitlist to secure your spot when we open up more invites.
+                                    Be the first to know when Forapplying Pro launches.
                                 </p>
+                                <ul className="text-left text-xs text-gray-600 mt-4 space-y-2">
+                                    <li className="flex items-start gap-2">
+                                        <span className="mt-1 h-1.5 w-1.5 rounded-full bg-indigo-500" />
+                                        More downloads included
+                                    </li>
+                                    <li className="flex items-start gap-2">
+                                        <span className="mt-1 h-1.5 w-1.5 rounded-full bg-indigo-500" />
+                                        Access to a future agent version of the app
+                                    </li>
+                                    <li className="flex items-start gap-2">
+                                        <span className="mt-1 h-1.5 w-1.5 rounded-full bg-indigo-500" />
+                                        Early access to new features
+                                    </li>
+                                </ul>
                             </div>
 
                             <form onSubmit={handleSubmit} className="space-y-4">
@@ -126,7 +140,7 @@ const BetaSignupModal: React.FC<BetaSignupModalProps> = ({ isOpen, onClose }) =>
                                             Saving...
                                         </>
                                     ) : (
-                                        'Join Waitlist'
+                                        'Join Pro Waitlist'
                                     )}
                                 </button>
                             </form>
