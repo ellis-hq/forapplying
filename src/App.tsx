@@ -357,6 +357,11 @@ const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }
       // Normalize all dates to "Month Year" format before storing
       tailoringResult.resume = normalizeResumeDates(tailoringResult.resume);
       setResult(tailoringResult);
+      // Reset prior edited/download variants so fresh optimizer output is the source of truth
+      setEditedResume(null);
+      setOnePageResume(null);
+      setEmploymentGaps([]);
+      setGapResolutions([]);
       setCurrentView(AppView.REVIEW); // Go to review screen after generation
     } catch (err: unknown) {
       console.error(err);
@@ -451,7 +456,10 @@ const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }
 
   // Handler for when resume builder completes
   const handleBuilderContinue = (resume: TailoredResumeData) => {
-    setBuiltResume(resume);
+    setBuiltResume(normalizeResumeDates(resume));
+    // Builder edits should be re-optimized; clear stale post-review state
+    setEditedResume(null);
+    setOnePageResume(null);
     setCurrentView(AppView.INPUT);
   };
 
@@ -478,10 +486,13 @@ const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }
   };
 
   // Handler for editing resume from review screen
-  const handleEditResume = () => {
-    if (result) {
-      setBuiltResume(result.resume);
+  const handleEditResume = (resumeFromReview?: EditableResumeData) => {
+    const latestResume = resumeFromReview || editedResume || result?.resume;
+    if (latestResume) {
+      setBuiltResume(normalizeResumeDates(latestResume));
     }
+    setEditedResume(null);
+    setOnePageResume(null);
     setEntryMode(ResumeEntryMode.BUILD);
     setCurrentView(AppView.BUILDER);
   };

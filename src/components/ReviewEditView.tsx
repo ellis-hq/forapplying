@@ -42,7 +42,7 @@ interface ReviewEditViewProps {
   onGenerateSuggestion: (skill: string, targetSection: GapTargetSection) => Promise<string>;
   onGenerateEmploymentGapSuggestions: (gap: EmploymentGap) => Promise<EmploymentGapSuggestion[]>;
   onContinue: (editedResume: EditableResumeData, employmentGaps: EmploymentGap[], gapResolutions: EmploymentGapResolutionState[]) => void;
-  onEditResume?: () => void;
+  onEditResume?: (editedResume: EditableResumeData) => void;
 }
 
 const MAX_CERT_NAME_LENGTH = 47;
@@ -853,7 +853,7 @@ const ReviewEditView: React.FC<ReviewEditViewProps> = ({
         {/* Edit Resume Button */}
         {onEditResume && (
           <button
-            onClick={onEditResume}
+            onClick={() => onEditResume(editedResume)}
             className="w-full flex items-center justify-center gap-2 px-6 py-3 border border-accent text-accent hover:bg-accent-light rounded-xl text-sm font-medium transition-all"
           >
             <Pencil className="w-4 h-4" />
