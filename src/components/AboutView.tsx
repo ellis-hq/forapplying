@@ -47,11 +47,11 @@ const AboutView: React.FC<AboutViewProps> = ({ onBack }) => {
             For inquiries, feedback, or concerns, please reach out:
           </p>
           <a
-            href="mailto:andrew@forapplying.com"
+            href="mailto:andrew@agegency.com"
             className="inline-flex items-center gap-2 text-accent hover:text-accent/80 transition-colors font-medium"
           >
             <Mail className="w-5 h-5" />
-            andrew@forapplying.com
+            andrew@agegency.com
           </a>
         </div>
       </div>
