@@ -1,4 +1,4 @@
-import { TailorResponse, RewriteMode, TailoredResumeData, GapTargetSection, ResumeStyle, EmploymentGap, EmploymentGapSuggestion } from "../types";
+import { TailorResponse, RewriteMode, TailoredResumeData, GapTargetSection, ResumeStyle, EmploymentGap, EmploymentGapSuggestion, JobProfile } from "../types";
 import { supabase } from "../lib/supabase";
 
 // Backend API URL - uses Vite proxy in development
@@ -111,7 +111,8 @@ export async function generateEmploymentGapSuggestions(
  */
 export async function convertToOnePage(
   resumeData: TailoredResumeData,
-  jobDescription: string
+  jobDescription: string,
+  jobProfile?: JobProfile
 ): Promise<TailoredResumeData> {
   const authHeaders = await getAuthHeaders();
   const response = await fetch(`${API_BASE_URL}/convert-one-page`, {
@@ -123,6 +124,7 @@ export async function convertToOnePage(
     body: JSON.stringify({
       resumeData,
       jobDescription,
+      jobProfile,
     }),
   });
 

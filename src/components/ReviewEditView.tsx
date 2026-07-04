@@ -1353,6 +1353,11 @@ const GapCard: React.FC<GapCardProps> = ({
             <p className="text-[10px] text-text-muted text-center">
               Adding to: {gap.targetSection === 'experience' ? `${experiences[gap.targetExperienceIndex ?? 0]?.role}` : gap.targetSection}
             </p>
+            {gap.suggestion !== undefined && (
+              <p className="text-[10px] text-warning text-center">
+                Only accept if this is true for you — you may be asked about it in an interview. Edit it to match your real experience.
+              </p>
+            )}
           </div>
         )}
 

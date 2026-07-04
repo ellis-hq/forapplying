@@ -175,9 +175,13 @@ const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }
 
   const matchScore = useMemo(() => {
     if (!result) return 0;
-    const total = result.report.keywords.length + result.report.gaps.length;
+    // Prefer the server-computed weighted score (Phase 3 pipeline)
+    if (result.matchScore) return result.matchScore.after;
+    // Fallback: the report now lists every profile keyword, found or not
+    const total = result.report.keywords.length;
     if (total === 0) return 100;
-    return Math.round((result.report.keywords.length / total) * 100);
+    const found = result.report.keywords.filter(k => k.foundIn.length > 0).length;
+    return Math.round((found / total) * 100);
   }, [result]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -404,7 +408,7 @@ const ResumeTailor: React.FC<ResumeTailorProps> = ({ user, profile, onDownload }
     setIsConverting(true);
     setError(null);
     try {
-      const onePage = await convertToOnePageAPI(resumeData, jobDesc);
+      const onePage = await convertToOnePageAPI(resumeData, jobDesc, result.jobProfile);
       setOnePageResume(normalizeResumeDates(onePage));
     } catch (err: unknown) {
       console.error(err);

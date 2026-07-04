@@ -122,6 +122,11 @@ const ResultView: React.FC<ResultViewProps> = ({
             <ScoreCircle score={matchScore} />
             <h2 className="text-sm font-bold text-text-primary">ATS Match Score</h2>
             <p className="text-xs text-text-muted mt-1">Based on keyword coverage</p>
+            {result.matchScore && result.matchScore.after > result.matchScore.before && (
+              <p className="text-xs font-semibold text-success mt-2 bg-success-light border border-success-border rounded-full px-3 py-1">
+                Up from {result.matchScore.before}% before tailoring
+              </p>
+            )}
           </div>
 
           <div className="space-y-6">
@@ -130,7 +135,7 @@ const ResultView: React.FC<ResultViewProps> = ({
                 <Target className="w-3 h-3 text-accent" /> Injected Keywords
               </h3>
               <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
-                {result.report.keywords.map((kw, i) => (
+                {result.report.keywords.filter(kw => kw.foundIn.length > 0).map((kw, i) => (
                   <div key={i} className="flex flex-col p-2 rounded-lg bg-border-light border border-border">
                     <div className="flex justify-between items-center mb-1">
                       <p className="text-xs font-semibold text-text-secondary">{kw.term}</p>
@@ -160,6 +165,22 @@ const ResultView: React.FC<ResultViewProps> = ({
                     <span key={i} className="px-2 py-1 bg-error-light text-error rounded border border-error-border text-[10px] font-medium">
                       {gap}
                     </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Fact-guard warnings: items that couldn't be traced to the original resume */}
+            {result.warnings && result.warnings.length > 0 && (
+              <div>
+                <h3 className="text-xs font-semibold text-warning uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <AlertTriangle className="w-3 h-3" /> Verify Before Sending
+                </h3>
+                <div className="space-y-1.5">
+                  {result.warnings.map((warning, i) => (
+                    <p key={i} className="text-[10px] text-text-secondary bg-warning-light border border-warning-border rounded-lg px-2 py-1.5">
+                      {warning}
+                    </p>
                   ))}
                 </div>
               </div>

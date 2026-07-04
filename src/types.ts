@@ -118,10 +118,36 @@ export interface KeywordReport {
   gaps: string[];
 }
 
+export interface JobProfileKeyword {
+  term: string;
+  type: 'must-have' | 'nice-to-have';
+  category: string;
+  variants: string[];
+}
+
+export interface JobProfile {
+  roleTitle: string;
+  seniority: string;
+  tone: string;
+  topPriorities: string[];
+  hardRequirements: string[];
+  keywords: JobProfileKeyword[];
+  actionVerbs: string[];
+}
+
+export interface MatchScore {
+  before: number;
+  after: number;
+}
+
 export interface TailorResponse {
   resume: TailoredResumeData;
   coverLetter: string;
   report: KeywordReport;
+  // Added by the two-stage tailoring pipeline; optional for backward compatibility
+  jobProfile?: JobProfile;
+  matchScore?: MatchScore;
+  warnings?: string[];
 }
 
 export enum RewriteMode {

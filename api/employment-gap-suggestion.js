@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { applyCors, enforceRateLimit, requireSupabaseAuth } from './_utils.js';
+import { TAILOR_MODEL } from './_tailorCore.js';
 
 // =============================================================================
 // INPUT VALIDATION & SANITIZATION
@@ -180,8 +181,9 @@ export default async function handler(req, res) {
     );
 
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: TAILOR_MODEL,
       max_tokens: 1024,
+      thinking: { type: 'disabled' },
       messages: [{ role: 'user', content: userPrompt }],
       system: systemPrompt,
     });
